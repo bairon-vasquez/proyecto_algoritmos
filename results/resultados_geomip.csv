@@ -1,4 +1,1 @@
 N,estado_inicial,parte1,parte2,phi,tiempo_s,estrategia
-3,000,[0],"[1, 2]",0.25317080,2.729339,GeometricSIA
-5,00000,[1],"[0, 2, 3, 4]",0.73016603,0.314012,GeometricSIA
-10,0000000000,[4],"[0, 1, 2, 3, 5, 6, 7, 8, 9]",1.59190417,4333.005380,GeometricSIA
