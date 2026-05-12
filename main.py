@@ -1,61 +1,40 @@
 """
 Punto de entrada principal del proyecto GeoMIP.
-Ejecuta GeometricSIA paralelo para N = 3, 5, 10, 15.
+Ejecuta GeometricSIA (k=2) y QNodesKPartition (k=3,4,5) para N=3,5,10,15.
 """
 import numpy as np
 import os
+import time
 import multiprocessing
 from src.models.system import System
 from src.controllers.strategies.geometric import GeometricSIA
+from src.controllers.strategies.qnodes import QNodesKPartition
 from src.utils.metrics import RegistroMetricas, Resultado
 
 
 def verificar_tabla_n3(sistema: System) -> bool:
-    """
-    Verifica costos calculados contra la Tabla 4.2 del documento 2.
-
-    El documento etiqueta los estados como 'abc' donde A=primer dígito.
-    Internamente, la variable A es bit0 (LSB). Por lo tanto:
-      doc_label 'abc' -> le_idx = a*1 + b*2 + c*4
-    (mismo orden que el sistema interno, sin transformación extra)
-    """
+    """Verifica costos contra Tabla 4.2 del documento 2."""
     geo = GeometricSIA(sistema)
     geo.tensores = sistema.obtener_tensores()
     geo.tabla_costos = geo._calcular_tabla_costos_paralelo()
 
     def doc_le(label: str) -> int:
-        """Convierte label doc 'abc' a índice LE: a=bit0, b=bit1, c=bit2."""
-        return int(label[0]) * 1 + int(label[1]) * 2 + int(label[2]) * 4
+        return int(label[0])*1 + int(label[1])*2 + int(label[2])*4
 
-    # Tabla 4.2 completa del documento 2
     tabla_doc = {
-        ('A','000'):0.0,    ('A','100'):0.0,    ('A','010'):0.0,
-        ('A','110'):0.0,    ('A','001'):0.5,    ('A','101'):0.375,
-        ('A','011'):0.375,  ('A','111'):0.21875,
-        ('B','000'):0.0,    ('B','100'):0.0,    ('B','010'):0.5,
-        ('B','110'):0.375,  ('B','001'):0.0,    ('B','101'):0.0,
-        ('B','011'):0.375,  ('B','111'):0.21875,
-        ('C','000'):0.0,    ('C','100'):0.5,    ('C','010'):0.0,
-        ('C','110'):0.375,  ('C','001'):0.0,    ('C','101'):0.375,
-        ('C','011'):0.0,    ('C','111'):0.21875,
+        ('A','000'):0.0, ('A','100'):0.0, ('A','010'):0.0, ('A','110'):0.0,
+        ('A','001'):0.5, ('A','101'):0.375, ('A','011'):0.375, ('A','111'):0.21875,
+        ('B','000'):0.0, ('B','100'):0.0, ('B','010'):0.5, ('B','110'):0.375,
+        ('B','001'):0.0, ('B','101'):0.0, ('B','011'):0.375, ('B','111'):0.21875,
+        ('C','000'):0.0, ('C','100'):0.5, ('C','010'):0.0, ('C','110'):0.375,
+        ('C','001'):0.0, ('C','101'):0.375, ('C','011'):0.0, ('C','111'):0.21875,
     }
-    # En el sistema interno (columnas invertidas al cargar):
-    # col 0 = variable C (bit2 del doc = bit0 interno... no)
-    # La inversión de columnas en desde_csv hace:
-    #   col_interna_0 = tensor de variable A del doc (col_doc_{n-1})
-    # Pero los tensores se obtienen por col interna.
-    # Con columnas invertidas: tensor[0]=A_doc, tensor[1]=B_doc, tensor[2]=C_doc
-    # Espera -- desde_csv hace tpm[:, ::-1], así:
-    #   col_interna_0 = col_doc_{n-1} = C_doc (para n=3)
-    #   col_interna_2 = col_doc_0     = A_doc
-    # Entonces tensor[0]=C_doc, tensor[1]=B_doc, tensor[2]=A_doc
-    # Para verificar la tabla del doc: A->tensor[2], B->tensor[1], C->tensor[0]
-    var_map = {"A": 0, "B": 1, "C": 2}
+    var_map = {'A': 0, 'B': 1, 'C': 2}
     idx_inicio = 0
 
-    print("\n  Verificacion Tabla 4.2 del documento 2:")
+    print("\n  Verificacion Tabla 4.2:")
     print(f"  {'Transicion':<22}{'Esperado':>10}{'Calculado':>11}{'':>5}")
-    print("  " + "-" * 51)
+    print("  " + "-"*51)
 
     todos_ok = True
     for (var, lbl), esp in tabla_doc.items():
@@ -65,78 +44,106 @@ def verificar_tabla_n3(sistema: System) -> bool:
         ok = abs(calc - esp) < 1e-4
         if not ok:
             todos_ok = False
-        s = "OK" if ok else "FAIL"
-        print(f"  t_{var}(000,{lbl})   {esp:>10.5f}  {calc:>10.5f}  {s}")
-
+        print(f"  t_{var}(000,{lbl})   {esp:>10.5f}  {calc:>10.5f}  {'OK' if ok else 'FAIL'}")
     return todos_ok
 
 
-def ejecutar_para_n(
-    n: int,
-    registro: RegistroMetricas,
-    carpeta: str = "data"
-) -> None:
-    """Ejecuta GeometricSIA paralelo para un sistema de N variables."""
-    ncpus = multiprocessing.cpu_count()
-    print(f"\n{'='*58}")
-    print(f"  GeometricSIA (paralelo) para N={n}  [{ncpus} CPUs]")
-    print(f"{'='*58}")
-
+def ejecutar_geometric(n, registro, carpeta="data"):
+    """Ejecuta GeometricSIA (bipartición k=2)."""
     estado = "0" * n
     csv_path = os.path.join(carpeta, f"N{n}C.csv")
-
     if not os.path.exists(csv_path):
-        print(f"  AVISO: {csv_path} no encontrado.")
         return
 
-    print(f"  Cargando: {csv_path}")
     sistema = System.desde_csv(csv_path, estado)
-    print(f"  {sistema}")
 
-    # Verificación especial para N=3 (caso de estudio del documento)
     if n == 3:
         ok = verificar_tabla_n3(sistema)
         print(f"\n  Tabla 4.2: {'CORRECTO ✓' if ok else 'INCORRECTO ✗'}")
 
-    # Ejecutar algoritmo
     estrategia = GeometricSIA(sistema)
     resultado = estrategia.ejecutar()
     estrategia.imprimir_resultado()
 
     registro.registrar(Resultado(
-        n=n,
-        estado_inicial=estado,
+        n=n, estado_inicial=estado,
         biparticion=resultado['biparticion'],
-        phi=resultado['phi'],
-        tiempo=resultado['tiempo'],
-        estrategia="GeometricSIA-Paralelo"
+        phi=resultado['phi'], tiempo=resultado['tiempo'],
+        estrategia="GeometricSIA-k2"
     ))
+
+
+def ejecutar_qnodes(n, registro, carpeta="data"):
+    """Ejecuta QNodesKPartition (k=3,4,5)."""
+    estado = "0" * n
+    csv_path = os.path.join(carpeta, f"N{n}C.csv")
+    if not os.path.exists(csv_path):
+        return
+
+    sistema = System.desde_csv(csv_path, estado)
+    print(f"\n  {'='*58}")
+    print(f"  QNodesKPartition para N={n}  (k=3,4,5)")
+    print(f"  {'='*58}")
+    print(f"  {sistema}")
+
+    estrategia = QNodesKPartition(sistema)
+    t0 = time.time()
+    resultado = estrategia.aplicar_estrategia()
+    resultado['tiempo'] = time.time() - t0
+    estrategia.resultado = resultado
+    estrategia.imprimir_resultado_k(resultado)
+
+    # Registrar el mejor resultado global
+    if resultado['biparticion']:
+        registro.registrar(Resultado(
+            n=n, estado_inicial=estado,
+            biparticion=(resultado['biparticion'][0],
+                        resultado['biparticion'][-1]),
+            phi=resultado['phi'],
+            tiempo=resultado['tiempo'],
+            estrategia=f"QNodes-k{resultado.get('k','?')}"
+        ))
 
 
 def main():
     ncpus = multiprocessing.cpu_count()
-    print("\n" + "=" * 58)
-    print("  PROYECTO GeoMIP - Algoritmo Geometrico Paralelo")
-    print("  Analisis y Diseno de Algoritmos 2025C")
-    print(f"  CPUs disponibles: {ncpus}")
-    print("=" * 58)
+    print("\n" + "="*60)
+    print("  PROYECTO GeoMIP")
+    print("  GeometricSIA (k=2) + QNodesKPartition (k=3,4,5)")
+    print("  Analisis y Diseno de Algoritmos 2026-1")
+    print("  Prof. Luz Enith")
+    print(f"  CPUs: {ncpus}")
+    print("="*60)
 
-    registro = RegistroMetricas(carpeta="results")
+    registro_geo  = RegistroMetricas(carpeta="results")
+    registro_qnod = RegistroMetricas(carpeta="results")
 
-    # N=20 eliminado: escala de memoria/tiempo prohibitiva
     for n in [3, 5, 10, 15]:
-        try:
-            ejecutar_para_n(n, registro)
-        except MemoryError:
-            print(f"  ERROR N={n}: Memoria insuficiente.")
-        except Exception as e:
-            print(f"  ERROR N={n}: {e}")
-            import traceback
-            traceback.print_exc()
+        print(f"\n{'#'*60}")
+        print(f"#  N = {n}")
+        print(f"{'#'*60}")
 
-    registro.resumen()
-    registro.guardar_csv("resultados_geomip.csv")
-    print("\n  Archivos de resultados guardados en: results/")
+        try:
+            print("\n>>> GeometricSIA (k=2):")
+            ejecutar_geometric(n, registro_geo)
+        except Exception as e:
+            print(f"  ERROR GeometricSIA N={n}: {e}")
+
+        try:
+            print("\n>>> QNodesKPartition (k=3,4,5):")
+            ejecutar_qnodes(n, registro_qnod)
+        except Exception as e:
+            print(f"  ERROR QNodes N={n}: {e}")
+            import traceback; traceback.print_exc()
+
+    print("\n" + "="*60)
+    print("  RESUMEN GeometricSIA (k=2)")
+    registro_geo.resumen()
+    registro_geo.guardar_csv("resultados_geometric.csv")
+
+    print("\n  RESUMEN QNodesKPartition (k=3,4,5)")
+    registro_qnod.resumen()
+    registro_qnod.guardar_csv("resultados_qnodes.csv")
 
 
 if __name__ == "__main__":
