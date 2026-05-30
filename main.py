@@ -11,8 +11,8 @@ import os
 import time
 import multiprocessing
 from src.models.system import System
-from src.controllers.strategies.geometric import GeometricSIA
-from src.controllers.strategies.qnodes import QNodesKPartition
+from src.controllers.strategies.geometric import KGeoMIP, GeometricSIA
+from src.controllers.strategies.qnodes import KQNodes, QNodesKPartition
 from src.utils.metrics import RegistroMetricas, Resultado
 
 
@@ -68,7 +68,7 @@ def ejecutar_geometric(n: int, registro: RegistroMetricas, carpeta: str = "data"
         ok = verificar_tabla_n3(sistema)
         print(f"\n  Tabla 4.2: {'CORRECTO' if ok else 'INCORRECTO'}")
 
-    estrategia = GeometricSIA(sistema)
+    estrategia = KGeoMIP(sistema)
 
     # Medir tiempo real incluyendo tabla T + EMD
     t0 = time.time()
@@ -118,7 +118,7 @@ def ejecutar_qnodes(n: int, registro: RegistroMetricas, carpeta: str = "data"):
     print(f"  {'='*58}")
     print(f"  {sistema}")
 
-    estrategia = QNodesKPartition(sistema)
+    estrategia = KQNodes(sistema)
     t0         = time.time()
     resultado  = estrategia.aplicar_estrategia()
     resultado['tiempo'] = time.time() - t0
@@ -136,47 +136,377 @@ def ejecutar_qnodes(n: int, registro: RegistroMetricas, carpeta: str = "data"):
         ))
 
 
-def main():
-    ncpus = multiprocessing.cpu_count()
-    print("\n" + "="*60)
-    print("  PROYECTO GeoMIP")
-    print("  GeometricSIA (k=2) + QNodesKPartition (k=3,4,5)")
-    print("  Analisis y Diseno de Algoritmos 2026-1")
-    print("  Prof. Luz Enith")
-    print(f"  CPUs: {ncpus}")
-    print(f"  phi normalizado: EMD_raw / n -> rango [0, 1]")
-    print("="*60)
+def ejecutar_prueba(
+    n: int,
+    estado_inicial: str,
+    alcance_str: str,
+    mecanismo_str: str,
+    csv_path: str,
+    registro_geo: RegistroMetricas,
+    registro_qnod: RegistroMetricas,
+    timeout_qnodes: int | None = None,
+    salida_path: str | None = None,
+    num_prueba: int = 0
+) -> None:
+    """
+    Ejecuta una prueba individual con alcance y mecanismo específicos.
+
+    n             : número de variables del sistema completo
+    estado_inicial: cadena binaria ej. '1000000000'
+    alcance_str   : variables en t+1 ej. 'ABCDEFGHIJ'
+    mecanismo_str : variables en t   ej. 'ABCDEFGHI'
+    csv_path      : ruta al CSV del sistema completo
+    """
+    if not os.path.exists(csv_path):
+        print(f"  AVISO: {csv_path} no encontrado.")
+        return
+
+    # Cargar sistema completo
+    sistema_completo = System.desde_csv(csv_path, estado_inicial)
+
+    # Convertir strings a listas de etiquetas
+    alcance_vars   = list(alcance_str)
+    mecanismo_vars = list(mecanismo_str)
+
+    # Construir subsistema con background conditions
+    subsistema = sistema_completo.construir_subsistema(
+        alcance_vars, mecanismo_vars
+    )
+
+    print(f"\n  Subsistema: alcance={alcance_str} mecanismo={mecanismo_str}")
+    print(f"  {subsistema}")
+
+    # Ejecutar KGeoMIP (bipartición k=2)
+    try:
+        geo = KGeoMIP(subsistema)
+        t0  = time.time()
+        res_geo = geo.aplicar_estrategia()
+        res_geo['tiempo'] = time.time() - t0
+
+        phi_raw  = res_geo['phi']
+        phi_norm = phi_raw / subsistema.n if subsistema.n > 0 else 0
+        res_geo['phi'] = phi_norm
+
+        p1, p2 = res_geo['biparticion']
+        etqs   = subsistema.etiquetas
+        print(f"  KGeoMIP k=2: phi={phi_norm:.6f} "
+              f"[{''.join(etqs[i] for i in p1)}]|"
+              f"[{''.join(etqs[i] for i in p2)}] "
+              f"t={res_geo['tiempo']:.4f}s")
+
+        registro_geo.registrar(Resultado(
+            n=subsistema.n,
+            estado_inicial=estado_inicial,
+            biparticion=res_geo['biparticion'],
+            phi=phi_norm,
+            tiempo=res_geo['tiempo'],
+            estrategia=f"KGeoMIP|alc={alcance_str}|mec={mecanismo_str}"
+        ))
+    except Exception as e:
+        print(f"  ERROR KGeoMIP: {e}")
+
+    # Ejecutar KQNodes (k=3,4,5)
+    try:
+        import threading
+
+        qn = KQNodes(subsistema)
+        t0 = time.time()
+
+        if timeout_qnodes and subsistema.n >= 9:
+            resultado_container = [None]
+            error_container     = [None]
+
+            def _ejecutar_qn():
+                try:
+                    resultado_container[0] = qn.aplicar_estrategia()
+                except Exception as ex:
+                    error_container[0] = ex
+
+            hilo = threading.Thread(target=_ejecutar_qn, daemon=True)
+            hilo.start()
+            hilo.join(timeout=timeout_qnodes)
+
+            if hilo.is_alive():
+                elapsed = time.time() - t0
+                print(f"  KQNodes TIMEOUT ({timeout_qnodes}s) para n={subsistema.n}")
+                if salida_path:
+                    with open(salida_path, 'a', encoding='utf-8') as f:
+                        f.write(f"{num_prueba},{subsistema.n},{estado_inicial},"
+                                f"{alcance_str},{mecanismo_str},"
+                                f"3,KQNodes-TIMEOUT,TIMEOUT,"
+                                f"-1,{elapsed:.4f}\n")
+                res_qn = None
+            else:
+                res_qn = resultado_container[0]
+                if error_container[0]:
+                    raise error_container[0]
+        else:
+            res_qn = qn.aplicar_estrategia()
+
+        if res_qn is not None:
+            res_qn['tiempo'] = time.time() - t0
+            qn.resultado = res_qn
+            qn.imprimir_resultado_k(res_qn)
+
+            if res_qn['biparticion']:
+                registro_qnod.registrar(Resultado(
+                    n=subsistema.n,
+                    estado_inicial=estado_inicial,
+                    biparticion=(res_qn['biparticion'][0],
+                                 res_qn['biparticion'][-1]),
+                    phi=res_qn['phi'],
+                    tiempo=res_qn['tiempo'],
+                    estrategia=f"KQNodes-k{res_qn.get('k','?')}|alc={alcance_str}|mec={mecanismo_str}"
+                ))
+
+    except Exception as e:
+        print(f"  ERROR KQNodes: {e}")
+
+
+# Pruebas N=10 según DatosPruebas2026_1.xlsx
+PRUEBAS_N10 = [
+    ("ABCDEFGHIJ", "ABCDEFGHIJ"),
+    ("ABCDEFGHIJ", "ABCDEFGHI"),
+    ("ABCDEFGHIJ", "BCDEFGHIJ"),
+    ("ABCDEFGHIJ", "BCDEFGHI"),
+    ("ABCDEFGHIJ", "ABDEGHJ"),
+    ("ABCDEFGHIJ", "ACEGI"),
+    ("ABCDEFGHIJ", "BDFHJ"),
+    ("ABCDEFGHI",  "ABCDEFGHIJ"),
+    ("ABCDEFGHI",  "ABCDEFGHI"),
+    ("ABCDEFGHI",  "BCDEFGHIJ"),
+    ("ABCDEFGHI",  "BCDEFGHI"),
+    ("ABCDEFGHI",  "ABDEGHJ"),
+    ("ABCDEFGHI",  "ACEGI"),
+    ("ABCDEFGHI",  "BDFHJ"),
+    ("BCDEFGHIJ",  "ABCDEFGHIJ"),
+    ("BCDEFGHIJ",  "ABCDEFGHI"),
+    ("BCDEFGHIJ",  "BCDEFGHIJ"),
+    ("BCDEFGHIJ",  "BCDEFGHI"),
+    ("BCDEFGHIJ",  "ABDEGHJ"),
+    ("BCDEFGHIJ",  "ACEGI"),
+    ("BCDEFGHIJ",  "BDFHJ"),
+    ("BCDEFGHI",   "ABCDEFGHIJ"),
+    ("BCDEFGHI",   "ABCDEFGHI"),
+    ("BCDEFGHI",   "BCDEFGHIJ"),
+    ("BCDEFGHI",   "BCDEFGHI"),
+    ("BCDEFGHI",   "ABDEGHJ"),
+    ("BCDEFGHI",   "ACEGI"),
+    ("BCDEFGHI",   "BDFHJ"),
+    ("ABDEGHJ",    "ABCDEFGHIJ"),
+    ("ABDEGHJ",    "ABCDEFGHI"),
+    ("ABDEGHJ",    "BCDEFGHIJ"),
+    ("ABDEGHJ",    "BCDEFGHI"),
+    ("ABDEGHJ",    "ABDEGHJ"),
+    ("ABDEGHJ",    "ACEGI"),
+    ("ABDEGHJ",    "BDFHJ"),
+    ("ACEGI",      "ABCDEFGHIJ"),
+    ("ACEGI",      "ABCDEFGHI"),
+    ("ACEGI",      "BCDEFGHIJ"),
+    ("ACEGI",      "BCDEFGHI"),
+    ("ACEGI",      "ABDEGHJ"),
+    ("ACEGI",      "ACEGI"),
+    ("ACEGI",      "BDFHJ"),
+    ("BDFHJ",      "ABCDEFGHIJ"),
+    ("BDFHJ",      "ABCDEFGHI"),
+    ("BDFHJ",      "BCDEFGHIJ"),
+    ("BDFHJ",      "BCDEFGHI"),
+    ("BDFHJ",      "ABDEGHJ"),
+    ("BDFHJ",      "ACEGI"),
+    ("BDFHJ",      "BDFHJ"),
+]
+
+# Pruebas N=15 según DatosPruebas2026_1.xlsx
+PRUEBAS_N15 = [
+    ("ABCDEFGHIJKLMNO", "ABCDEFGHIJKLMNO"),
+    ("ABCDEFGHIJKLMNO", "ABCDEFGHIJKLMN"),
+    ("ABCDEFGHIJKLMNO", "BCDEFGHIJKLMNO"),
+    ("ABCDEFGHIJKLMNO", "BCDEFGHIJKLMN"),
+    ("ABCDEFGHIJKLMNO", "ABDEGHJKMN"),
+    ("ABCDEFGHIJKLMNO", "ACEGIKMO"),
+    ("ABCDEFGHIJKLMNO", "BDFHJLN"),
+    ("ABCDEFGHIJKLMN",  "ABCDEFGHIJKLMNO"),
+    ("ABCDEFGHIJKLMN",  "ABCDEFGHIJKLMN"),
+    ("ABCDEFGHIJKLMN",  "BCDEFGHIJKLMNO"),
+    ("ABCDEFGHIJKLMN",  "BCDEFGHIJKLMN"),
+    ("ABCDEFGHIJKLMN",  "ABDEGHJKMN"),
+    ("ABCDEFGHIJKLMN",  "ACEGIKMO"),
+    ("ABCDEFGHIJKLMN",  "BDFHJLN"),
+    ("BCDEFGHIJKLMNO",  "ABCDEFGHIJKLMNO"),
+    ("BCDEFGHIJKLMNO",  "ABCDEFGHIJKLMN"),
+    ("BCDEFGHIJKLMNO",  "BCDEFGHIJKLMNO"),
+    ("BCDEFGHIJKLMNO",  "BCDEFGHIJKLMN"),
+    ("BCDEFGHIJKLMNO",  "ABDEGHJKMN"),
+    ("BCDEFGHIJKLMNO",  "ACEGIKMO"),
+    ("BCDEFGHIJKLMNO",  "BDFHJLN"),
+    ("BCDEFGHIJKLMN",   "ABCDEFGHIJKLMNO"),
+    ("BCDEFGHIJKLMN",   "ABCDEFGHIJKLMN"),
+    ("BCDEFGHIJKLMN",   "BCDEFGHIJKLMNO"),
+    ("BCDEFGHIJKLMN",   "BCDEFGHIJKLMN"),
+    ("BCDEFGHIJKLMN",   "ABDEGHJKMN"),
+    ("BCDEFGHIJKLMN",   "ACEGIKMO"),
+    ("BCDEFGHIJKLMN",   "BDFHJLN"),
+    ("ABDEGHJKMN",      "ABCDEFGHIJKLMNO"),
+    ("ABDEGHJKMN",      "ABCDEFGHIJKLMN"),
+    ("ABDEGHJKMN",      "BCDEFGHIJKLMNO"),
+    ("ABDEGHJKMN",      "BCDEFGHIJKLMN"),
+    ("ABDEGHJKMN",      "ABDEGHJKMN"),
+    ("ABDEGHJKMN",      "ACEGIKMO"),
+    ("ABDEGHJKMN",      "BDFHJLN"),
+    ("ACEGIKMO",        "ABCDEFGHIJKLMNO"),
+    ("ACEGIKMO",        "ABCDEFGHIJKLMN"),
+    ("ACEGIKMO",        "BCDEFGHIJKLMNO"),
+    ("ACEGIKMO",        "BCDEFGHIJKLMN"),
+    ("ACEGIKMO",        "ABDEGHJKMN"),
+    ("ACEGIKMO",        "ACEGIKMO"),
+    ("ACEGIKMO",        "BDFHJLN"),
+    ("BDFHJLN",         "ABCDEFGHIJKLMNO"),
+    ("BDFHJLN",         "ABCDEFGHIJKLMN"),
+    ("BDFHJLN",         "BCDEFGHIJKLMNO"),
+    ("BDFHJLN",         "BCDEFGHIJKLMN"),
+    ("BDFHJLN",         "ABDEGHJKMN"),
+    ("BDFHJLN",         "ACEGIKMO"),
+    ("BDFHJLN",         "BDFHJLN"),
+    ("BCDEFGJKLMNO",    "BCDEFGHIJKLMNO"),
+]
+
+
+def ejecutar_suite_pruebas(
+    n: int,
+    estado_inicial: str,
+    sistema_str: str,
+    pruebas: list,
+    carpeta: str = "data"
+) -> None:
+    """
+    Ejecuta todas las pruebas del Excel para un tamaño N dado.
+    Guarda resultados en results/resultados_suite_N{n}.csv
+    """
+    csv_path = os.path.join(carpeta, f"N{n}C.csv")
+    if not os.path.exists(csv_path):
+        print(f"  AVISO: {csv_path} no encontrado.")
+        return
+
+    os.makedirs("results", exist_ok=True)
+    salida_path = os.path.join("results", f"resultados_suite_N{n}.csv")
+
+    # Encabezado del CSV de resultados
+    with open(salida_path, 'w', encoding='utf-8') as f:
+        f.write("prueba,n_sub,estado_inicial,alcance,mecanismo,"
+                "k,estrategia,particion,perdida,tiempo_s\n")
 
     reg_geo  = RegistroMetricas(carpeta="results")
     reg_qnod = RegistroMetricas(carpeta="results")
 
-    for n in [3, 5, 10, 15]:
-        print(f"\n{'#'*60}")
-        print(f"#  N = {n}")
-        print(f"{'#'*60}")
+    total = len(pruebas)
+    print(f"\n{'='*60}")
+    print(f"  Suite N={n} — {total} pruebas")
+    print(f"  Estado inicial: {estado_inicial}")
+    print(f"  CSV: {csv_path}")
+    print(f"{'='*60}")
+
+    for num, (alcance_str, mecanismo_str) in enumerate(pruebas, start=1):
+        print(f"\n[{num}/{total}] alcance={alcance_str}  mecanismo={mecanismo_str}")
+
+        # Estimar tamaño del subsistema para decidir timeout
+        # n_sub >= 9: KQNodes puede tardar horas -> timeout 600s (10 min)
+        n_sub_estimado = min(len(alcance_str), len(mecanismo_str))
+        usar_timeout   = n_sub_estimado >= 9
 
         try:
-            print("\n>>> GeometricSIA (k=2):")
-            ejecutar_geometric(n, reg_geo)
-        except Exception as e:
-            print(f"  ERROR GeometricSIA N={n}: {e}")
-            import traceback; traceback.print_exc()
+            ejecutar_prueba(
+                n=n,
+                estado_inicial=estado_inicial,
+                alcance_str=alcance_str,
+                mecanismo_str=mecanismo_str,
+                csv_path=csv_path,
+                registro_geo=reg_geo,
+                registro_qnod=reg_qnod,
+                timeout_qnodes=600 if usar_timeout else None,
+                salida_path=salida_path,
+                num_prueba=num
+            )
 
-        try:
-            print("\n>>> QNodesKPartition (k=3,4,5):")
-            ejecutar_qnodes(n, reg_qnod)
-        except Exception as e:
-            print(f"  ERROR QNodes N={n}: {e}")
-            import traceback; traceback.print_exc()
+            # Guardar en CSV de suite inmediatamente (no perder datos si se cuelga)
+            with open(salida_path, 'a', encoding='utf-8') as f:
+                # Buscar el último resultado registrado de cada estrategia
+                if reg_geo.resultados:
+                    r = reg_geo.resultados[-1]
+                    p1, p2 = r.biparticion
+                    part_str = f"[{','.join(str(x) for x in p1)}]|[{','.join(str(x) for x in p2)}]"
+                    f.write(f'{num},{r.n},{estado_inicial},'
+                            f'{alcance_str},{mecanismo_str},'
+                            f'2,KGeoMIP,"{part_str}",'
+                            f'{r.phi:.8f},{r.tiempo:.4f}\n')
+                if reg_qnod.resultados:
+                    r = reg_qnod.resultados[-1]
+                    p1, p2 = r.biparticion
+                    part_str = f"[{','.join(str(x) for x in p1)}]|[{','.join(str(x) for x in p2)}]"
+                    k_val = r.estrategia.split('-k')[1].split('|')[0] if '-k' in r.estrategia else '?'
+                    f.write(f'{num},{r.n},{estado_inicial},'
+                            f'{alcance_str},{mecanismo_str},'
+                            f'{k_val},KQNodes,"{part_str}",'
+                            f'{r.phi:.8f},{r.tiempo:.4f}\n')
 
+        except Exception as e:
+            print(f"  ERROR prueba {num}: {e}")
+            with open(salida_path, 'a', encoding='utf-8') as f:
+                f.write(f"{num},ERROR,{estado_inicial},"
+                        f"{alcance_str},{mecanismo_str},?,?,ERROR,0,0\n")
+
+    print(f"\n  Resultados guardados en: {salida_path}")
+    reg_geo.guardar_csv(f"resultados_geo_N{n}.csv")
+    reg_qnod.guardar_csv(f"resultados_qnod_N{n}.csv")
+
+
+def main():
+    ncpus = multiprocessing.cpu_count()
     print("\n" + "="*60)
-    print("  RESUMEN GeometricSIA (k=2)  [phi normalizado en [0,1]]")
-    reg_geo.resumen()
-    reg_geo.guardar_csv("resultados_geometric.csv")
+    print("  PROYECTO KQNodes / KGeoMIP")
+    print("  Analisis y Diseno de Algoritmos 2026-1")
+    print(f"  CPUs: {ncpus}")
+    print("="*60)
 
-    print("\n  RESUMEN QNodesKPartition (k=3,4,5)  [phi normalizado en [0,1]]")
-    reg_qnod.resumen()
-    reg_qnod.guardar_csv("resultados_qnodes.csv")
+    import sys
+    modo = sys.argv[1] if len(sys.argv) > 1 else "normal"
+
+    if modo == "suite_n10":
+        ejecutar_suite_pruebas(
+            n=10,
+            estado_inicial="1000000000",
+            sistema_str="ABCDEFGHIJ",
+            pruebas=PRUEBAS_N10
+        )
+    elif modo == "suite_n15":
+        ejecutar_suite_pruebas(
+            n=15,
+            estado_inicial="100000000000000",
+            sistema_str="ABCDEFGHIJKLMNO",
+            pruebas=PRUEBAS_N15
+        )
+    else:
+        # Modo normal: ejecutar para N=3,5,10,15 como antes
+        reg_geo  = RegistroMetricas(carpeta="results")
+        reg_qnod = RegistroMetricas(carpeta="results")
+
+        for n in [3, 5, 10, 15]:
+            print(f"\n{'#'*60}\n#  N = {n}\n{'#'*60}")
+            try:
+                print("\n>>> KGeoMIP (k=2):")
+                ejecutar_geometric(n, reg_geo)
+            except Exception as e:
+                print(f"  ERROR KGeoMIP N={n}: {e}")
+            try:
+                print("\n>>> KQNodes (k=3,4,5):")
+                ejecutar_qnodes(n, reg_qnod)
+            except Exception as e:
+                print(f"  ERROR KQNodes N={n}: {e}")
+
+        print("\n" + "="*60)
+        reg_geo.resumen()
+        reg_geo.guardar_csv("resultados_geometric.csv")
+        reg_qnod.resumen()
+        reg_qnod.guardar_csv("resultados_qnodes.csv")
 
 
 if __name__ == "__main__":

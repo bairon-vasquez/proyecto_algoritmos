@@ -21,11 +21,11 @@ class System:
     ):
         self.tpm = tpm.copy()
         self.estado_inicial = estado_inicial
-        self.n = len(estado_inicial)
-        self.num_estados = 2 ** self.n
-        self.etiquetas = etiquetas or [
-            chr(ord('A') + i) for i in range(self.n)
+        self.etiquetas = etiquetas if etiquetas is not None else [
+            chr(ord('A') + i) for i in range(len(estado_inicial))
         ]
+        self.n = len(self.etiquetas)
+        self.num_estados = 2 ** self.n
 
     @classmethod
     def desde_csv(cls, filepath: str, estado_inicial: str) -> "System":
@@ -113,8 +113,55 @@ class System:
     def marginalizar_columnas(self, indices_elim: list[int]) -> "System":
         """Marginaliza eliminando variables del tiempo t+1 (columnas)."""
         cols = [j for j in range(self.n) if j not in indices_elim]
-        etqs = [self.etiquetas[j] for j in cols]
-        return System(self.tpm[:, cols], self.estado_inicial, etqs)
+        etqs      = [self.etiquetas[j] for j in cols]
+        tpm_nueva = self.tpm[:, cols]
+        # n se recalcula desde las etiquetas reales, no desde las filas
+        return System(tpm_nueva, self.estado_inicial, etqs)
+
+    def construir_subsistema(
+        self,
+        alcance_vars: list[str],
+        mecanismo_vars: list[str]
+    ) -> "System":
+        """
+        Construye el subsistema para un alcance y mecanismo dados.
+
+        alcance_vars  : variables en t+1 ej. ['A','B','C']
+        mecanismo_vars: variables en t   ej. ['A','B']
+
+        Proceso:
+        1. Variables fuera del mecanismo -> condicionar al valor del estado inicial
+        2. Variables fuera del alcance   -> marginalizar columnas (descartar)
+        """
+        # Paso 1: condicionar variables fuera del mecanismo
+        fuera_mec_indices = [
+            i for i, etq in enumerate(self.etiquetas)
+            if etq not in mecanismo_vars
+        ]
+
+        if fuera_mec_indices:
+            valores = [
+                (int(self.estado_inicial[::-1], 2) >> i) & 1
+                for i in fuera_mec_indices
+            ]
+            sistema_cond = self.condicionar(fuera_mec_indices, valores)
+        else:
+            sistema_cond = self
+
+        # Paso 2: descartar columnas cuya etiqueta NO está en alcance_vars
+        # IMPORTANTE: usar las etiquetas del sistema condicionado,
+        # que pueden ser distintas al sistema original
+        fuera_alc_indices = [
+            i for i, etq in enumerate(sistema_cond.etiquetas)
+            if etq not in alcance_vars
+        ]
+
+        if fuera_alc_indices:
+            sistema_final = sistema_cond.marginalizar_columnas(fuera_alc_indices)
+        else:
+            sistema_final = sistema_cond
+
+        return sistema_final
 
     def obtener_tensores(self) -> list[NDArray[np.float64]]:
         """Retorna n tensores elementales: uno por variable futura."""

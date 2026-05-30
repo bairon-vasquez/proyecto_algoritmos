@@ -93,7 +93,7 @@ def _dist_parte_vectorizada(
     return dist
 
 
-class QNodesKPartition(SIA):
+class KQNodes(SIA):
     """
     Estrategia Q-Nodos para k-particiones óptimas (k = 3, 4, 5).
 
@@ -317,3 +317,7 @@ class QNodesKPartition(SIA):
         print(f"  Tiempo      : {resultado.get('tiempo', 0):.4f}s")
         print(f"  phi en [0,1]: {0 <= phi_opt <= 1.0 + 1e-9}")
         print("=" * 60 + "\n")
+
+
+# Alias de compatibilidad
+QNodesKPartition = KQNodes

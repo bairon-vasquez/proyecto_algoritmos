@@ -54,7 +54,7 @@ def _calcular_tensor_paralelo(args):
         return var_idx, T
 
 
-class GeometricSIA(SIA):
+class KGeoMIP(SIA):
     """
     Estrategia geométrica PARALELA para encontrar la bipartición óptima.
 
@@ -296,3 +296,7 @@ class GeometricSIA(SIA):
             return dist
 
         return np.kron(dist_parte(p1f, p1p), dist_parte(p2f, p2p))
+
+
+# Alias de compatibilidad
+GeometricSIA = KGeoMIP
