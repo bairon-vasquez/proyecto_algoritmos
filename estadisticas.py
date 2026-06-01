@@ -3,6 +3,9 @@ import csv, os
 for archivo, nombre in [
     ('results/resultados_suite_N10.csv', 'N=10'),
     ('results/resultados_suite_N15.csv', 'N=15'),
+    ('results/resultados_suite_N20.csv', 'N=20'),
+    ('results/resultados_suite_N22.csv', 'N=22'),
+    ('results/resultados_suite_N25.csv', 'N=25'),
 ]:
     if not os.path.exists(archivo):
         continue

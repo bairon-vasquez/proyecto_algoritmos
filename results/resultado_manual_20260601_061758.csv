@@ -1,0 +1,5 @@
+Estrategia,k,Partición,Pérdida (φ),Tiempo (s)
+KGeoMIP,2,[DF] | [BHJ],0.000000,1.739
+KQNodes,3,{B} | {DFH} | {J},0.300000,0.037
+KQNodes,4,{B} | {D} | {FH} | {J},0.400000,0.037
+KQNodes,5,{B} | {D} | {F} | {H} | {J},0.500000,0.037

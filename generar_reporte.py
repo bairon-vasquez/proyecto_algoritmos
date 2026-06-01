@@ -91,6 +91,9 @@ def main():
     archivos = [
         ("results/resultados_suite_N10.csv", "Suite N=10"),
         ("results/resultados_suite_N15.csv", "Suite N=15"),
+        ("results/resultados_suite_N20.csv", "Suite N=20"),
+        ("results/resultados_suite_N22.csv", "Suite N=22"),
+        ("results/resultados_suite_N25.csv", "Suite N=25"),
         ("results/resultados_geometric.csv", "GeometricSIA modo normal"),
         ("results/resultados_qnodes.csv",    "QNodes modo normal"),
     ]

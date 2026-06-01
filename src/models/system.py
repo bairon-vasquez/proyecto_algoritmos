@@ -131,7 +131,10 @@ class System:
 
         Proceso:
         1. Variables fuera del mecanismo -> condicionar al valor del estado inicial
+        1.5 Variables en el mecanismo pero fuera del alcance -> marginalizar filas
+            (sus estados se promedian; esto ocurre cuando mec ⊃ alc)
         2. Variables fuera del alcance   -> marginalizar columnas (descartar)
+            Incluye columnas huérfanas generadas por el paso 1.5.
         """
         # Paso 1: condicionar variables fuera del mecanismo
         fuera_mec_indices = [
@@ -148,16 +151,30 @@ class System:
         else:
             sistema_cond = self
 
-        # Paso 2: descartar columnas cuya etiqueta NO está en alcance_vars
-        # IMPORTANTE: usar las etiquetas del sistema condicionado,
-        # que pueden ser distintas al sistema original
-        fuera_alc_indices = [
+        # Paso 1.5: marginalizar FILAS de variables que están en el mecanismo
+        # pero NO en el alcance.  Esto ocurre cuando mec ⊃ alc: las variables
+        # extra del mecanismo se promedian (no condicionan) para que el número
+        # de filas coincida con 2^|alcance ∩ mec|.
+        mec_no_alc = [
             i for i, etq in enumerate(sistema_cond.etiquetas)
             if etq not in alcance_vars
         ]
+        if mec_no_alc:
+            sistema_cond = sistema_cond.marginalizar_filas(mec_no_alc)
 
-        if fuera_alc_indices:
-            sistema_final = sistema_cond.marginalizar_columnas(fuera_alc_indices)
+        # Paso 2: descartar columnas cuya etiqueta NO está en alcance_vars,
+        # más las columnas huérfanas que quedaron del paso 1.5
+        # (marginalizar_filas reduce filas pero no las columnas correspondientes).
+        fuera_alc_col = [
+            i for i, etq in enumerate(sistema_cond.etiquetas)
+            if etq not in alcance_vars
+        ]
+        cols_huerfanas = list(range(len(sistema_cond.etiquetas),
+                                    sistema_cond.tpm.shape[1]))
+        todas_extra = sorted(set(fuera_alc_col + cols_huerfanas))
+
+        if todas_extra:
+            sistema_final = sistema_cond.marginalizar_columnas(todas_extra)
         else:
             sistema_final = sistema_cond
 
