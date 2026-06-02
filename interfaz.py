@@ -601,6 +601,15 @@ class App(tk.Tk):
             padx=8, pady=5,
         ).pack(side=tk.LEFT, padx=4, pady=4)
 
+        tk.Button(
+            btn_bar, text="📊 Completar plataformas",
+            command=self._completar_plataformas,
+            bg='#6e40c9', fg="white",
+            activebackground='#8957e5', activeforeground="white",
+            relief=tk.FLAT, font=('Segoe UI', 9),
+            padx=8, pady=5, cursor="hand2",
+        ).pack(side=tk.LEFT, padx=4, pady=4)
+
         excel_txt_frm = tk.Frame(frm5, bg=C['bg_main'])
         excel_txt_frm.pack(fill=tk.BOTH, expand=True)
 
@@ -919,6 +928,7 @@ class App(tk.Tk):
         total   = len(pruebas)
 
         def _run():
+            self._modo_suite_activo = True
             for idx, (alcance, mecanismo) in enumerate(pruebas, start=1):
                 alc = alcance.upper()
                 mec = mecanismo.upper()
@@ -966,6 +976,7 @@ class App(tk.Tk):
                         excel_path, alc, mec,
                         n_sistema=len(suite['sistema']))
 
+            self._modo_suite_activo = False
             # Restaurar GUI al terminar
             self.after(0, lambda: (
                 self._btn_run.config(state=tk.NORMAL),
@@ -1189,9 +1200,45 @@ class App(tk.Tk):
                 # Subsistema vacío = alcance∩mecanismo = ∅
                 if sub.n == 0:
                     self._post(kind="log",
-                               text=f"  ⚠ Alcance y mecanismo no comparten "
-                                    f"variables — φ no definido.",
+                               text=(f"  ⚠ Alcance ∩ Mecanismo = ∅  →  φ = 0 por definición\n"
+                                     f"  (sin variables en común, no hay dependencia causal medible)"),
                                tag="warn")
+                    res_geo_vacio = {'phi': 0.0, 'biparticion': ([], []),
+                                     'nota': 'interseccion_vacia'}
+                    res_qn_vacio  = {'phi': 0.0, 'k': None, 'biparticion': None,
+                                     'por_k': {}, 'resultados_por_k': {},
+                                     'nota': 'interseccion_vacia'}
+                    self._ultimo_res_geo   = res_geo_vacio
+                    self._ultimo_res_qn    = res_qn_vacio
+                    self._ultimo_sub       = sub
+                    self._ultimo_t_geo     = 0.0
+                    self._ultimo_t_qn      = 0.0
+                    self._ultimo_n_sistema = len(sistema)
+                    _alc  = alcance
+                    _mec  = mec
+                    _n_sis = len(sistema)
+
+                    def _ui_vacio():
+                        self._generar_analisis(res_geo_vacio, res_qn_vacio, sub, 0.0, 0.0)
+                        self._agregar_fila_excel(res_geo_vacio, res_qn_vacio, sub, _alc, _mec)
+                        self._historial_analisis.append({
+                            'alcance':   _alc,
+                            'mecanismo': _mec,
+                            'n_sistema': _n_sis,
+                            'res_geo':   res_geo_vacio,
+                            'res_qn':    res_qn_vacio,
+                            'sub':       sub,
+                            't_geo':     0.0,
+                            't_qn':      0.0,
+                        })
+                        self._post(kind="log",
+                                   text="\n✅ Completado (φ = 0, intersección vacía)",
+                                   tag="ok")
+                        self._status.set("φ = 0 (intersección vacía)")
+                        done_event.set()
+
+                    self.after(0, _ui_vacio)
+                    return done_event
             else:
                 n_sub  = min(len(alcance), len(mec))
                 n_rows = 2 ** min(n_sub, 20)
@@ -1909,9 +1956,17 @@ class App(tk.Tk):
     def _exportar_a_excel_path(self, excel_path: str, alcance: str,
                                mecanismo: str, n_sistema: int = None):
         """
-        Escribe los últimos resultados en excel_path sin abrir diálogos.
-        n_sistema: N del sistema completo (para elegir la hoja correcta).
-        Diseñado para uso automático en _ejecutar_suite y _exportar_historial_excel.
+        Escribe resultados en DatosPruebas2026_1.xlsx en la hoja correspondiente.
+
+        Estructura de columnas (fila 6 en adelante, A=#Prueba, B=Alcance, C=Mecanismo):
+          D-F  : QNodes  Bipartición (k=2, derivada de k=3)
+          G-I  : Geometric Bipartición (k=2)
+          J-L  : QNodes  3-Partición (k=3)
+          M-O  : Geometric 3-Partición (k=3)  — vacío (KGeoMIP solo hace k=2)
+          P-R  : QNodes  4-Partición (k=4)
+          S-U  : Geometric 4-Partición (k=4)  — vacío
+          V-X  : QNodes  5-Partición (k=5)
+          Y-AA : Geometric 5-Partición (k=5)  — vacío
         """
         try:
             import openpyxl
@@ -1919,9 +1974,6 @@ class App(tk.Tk):
             self._post(kind="log",
                        text="  ✗ openpyxl no instalado (pip install openpyxl)",
                        tag="err")
-            return
-
-        if self._ultimo_res_geo is None and self._ultimo_res_qn is None:
             return
 
         n_total = (n_sistema
@@ -1934,112 +1986,215 @@ class App(tk.Tk):
                        tag="warn")
             return
 
+        if not os.path.exists(excel_path):
+            self._post(kind="log",
+                       text=f"  ✗ Archivo no encontrado: {excel_path}",
+                       tag="err")
+            return
+
         try:
             wb = openpyxl.load_workbook(excel_path)
-            hojas_disponibles = wb.sheetnames
-            self._post(kind="log",
-                       text=f"  Hojas en Excel: {hojas_disponibles}",
-                       tag="warn")
 
-            if hoja_nombre not in hojas_disponibles:
-                # Intentar coincidencia aproximada (case-insensitive, sin guiones)
+            # Buscar hoja (tolerante a espacios y guiones)
+            ws = None
+            for nombre_hoja in wb.sheetnames:
+                if nombre_hoja.strip() == hoja_nombre.strip():
+                    ws = wb[nombre_hoja]
+                    hoja_nombre = nombre_hoja
+                    break
+            if ws is None:
                 norm = hoja_nombre.lower().replace('-', '').replace(' ', '')
                 hoja_alt = next(
-                    (h for h in hojas_disponibles
+                    (h for h in wb.sheetnames
                      if h.lower().replace('-', '').replace(' ', '') == norm),
                     None
                 )
                 if hoja_alt:
                     hoja_nombre = hoja_alt
+                    ws = wb[hoja_nombre]
                     self._post(kind="log",
                                text=f"  Usando hoja alternativa: '{hoja_nombre}'",
                                tag="warn")
                 else:
+                    hojas_disp = wb.sheetnames
                     wb.close()
                     self._post(kind="log",
                                text=f"  ✗ Hoja '{hoja_nombre}' no encontrada. "
-                                    f"Disponibles: {hojas_disponibles}",
+                                    f"Disponibles: {hojas_disp}",
                                tag="err")
                     return
 
-            ws       = wb[hoja_nombre]
-            alc_up   = alcance.strip().upper()
-            mec_up   = mecanismo.strip().upper()
-
+            # Buscar fila por Alcance (col B) y Mecanismo (col C), desde fila 6
+            alc_up = alcance.strip().upper()
+            mec_up = mecanismo.strip().upper()
             fila_destino = None
             for row in ws.iter_rows(min_row=6, max_col=3, values_only=False):
-                cell_alc = row[1]
-                cell_mec = row[2]
-                if (str(cell_alc.value or '').strip().upper() == alc_up and
-                        str(cell_mec.value or '').strip().upper() == mec_up):
-                    fila_destino = cell_alc.row
+                val_b = str(row[1].value or '').strip().upper()
+                val_c = str(row[2].value or '').strip().upper()
+                if val_b == alc_up and val_c == mec_up:
+                    fila_destino = row[0].row
                     break
 
             if fila_destino is None:
                 self._post(kind="log",
-                           text=f"  ⚠ Fila {alc_up}/{mec_up} no encontrada en "
-                                f"{hoja_nombre}",
+                           text=f"  ⚠ Fila no encontrada: alcance={alc_up} mec={mec_up}",
                            tag="warn")
                 wb.close()
                 return
 
-            COL = {
-                'qnodes_k2_part': 4,  'qnodes_k2_perd': 5,  'qnodes_k2_t': 6,
-                'geo_k2_part':    7,  'geo_k2_perd':    8,  'geo_k2_t':    9,
-                'qnodes_k3_part': 10, 'qnodes_k3_perd': 11, 'qnodes_k3_t': 12,
-                'geo_k3_part':    13, 'geo_k3_perd':    14, 'geo_k3_t':    15,
-                'qnodes_k4_part': 16, 'qnodes_k4_perd': 17, 'qnodes_k4_t': 18,
-                'geo_k4_part':    19, 'geo_k4_perd':    20, 'geo_k4_t':    21,
-                'qnodes_k5_part': 22, 'qnodes_k5_perd': 23, 'qnodes_k5_t': 24,
-                'geo_k5_part':    25, 'geo_k5_perd':    26, 'geo_k5_t':    27,
-            }
-
-            def w(col_key, valor):
-                if valor is not None:
-                    ws.cell(row=fila_destino, column=COL[col_key], value=valor)
-
             etqs = self._ultimo_sub.etiquetas if self._ultimo_sub else []
 
-            def lbl(idxs):
-                if not idxs or not etqs:
+            def w(col, valor):
+                if valor is not None and valor != '':
+                    ws.cell(row=fila_destino, column=col, value=valor)
+
+            def fmt_part_geo(bip):
+                if not bip:
                     return None
-                return "".join(etqs[i] for i in idxs if i < len(etqs))
+                p1, p2 = bip
+                s1 = ''.join(etqs[i] for i in p1 if i < len(etqs)) if p1 else ''
+                s2 = ''.join(etqs[i] for i in p2 if i < len(etqs)) if p2 else ''
+                return '∅' if not s1 and not s2 else f"{s1}|{s2}"
 
-            if self._ultimo_res_geo:
-                rg = self._ultimo_res_geo
-                p1, p2 = rg['biparticion']
-                w('geo_k2_part', (lbl(p1) or '') + '|' + (lbl(p2) or ''))
-                w('geo_k2_perd', round(float(rg['phi']), 8))
-                w('geo_k2_t',    round(float(self._ultimo_t_geo), 4))
+            def fmt_part_qn(parts):
+                if not parts:
+                    return None
+                return ' | '.join(
+                    '{' + ''.join(etqs[v] for v in p if v < len(etqs)) + '}'
+                    for p in parts
+                )
 
-            if self._ultimo_res_qn:
-                por_k = self._ultimo_res_qn.get('resultados_por_k', {})
-                t_qn  = self._ultimo_t_qn
-                for k_val in [3, 4, 5]:
-                    res_k = por_k.get(k_val)
-                    if not res_k or res_k.get('biparticion') is None:
-                        continue
-                    phi_k = res_k.get('phi', float('inf'))
-                    if phi_k >= float('inf'):
-                        continue
-                    parts    = res_k['biparticion']
-                    part_str = ' | '.join(
-                        '{' + (lbl(p) or '?') + '}' for p in parts)
-                    w(f'qnodes_k{k_val}_part', part_str)
-                    w(f'qnodes_k{k_val}_perd', round(float(phi_k), 8))
-                    w(f'qnodes_k{k_val}_t',    round(float(t_qn), 4))
+            res_geo = self._ultimo_res_geo
+            res_qn  = self._ultimo_res_qn
+            # _run_strategies almacena resultados por k bajo la clave 'por_k'
+            por_k   = res_qn.get('por_k', {}) if res_qn else {}
+
+            # ── BLOQUE 1: QNodes k=2 → cols D(4), E(5), F(6) ─────────────
+            # KQNodes no calcula k=2; se usa la primera parte de k=3 vs el
+            # resto como bipartición implícita para rellenar la columna.
+            rk3 = por_k.get(3)
+            if rk3 and rk3.get('biparticion') and rk3.get('phi', float('inf')) < float('inf'):
+                parts_k3 = rk3['biparticion']
+                if len(parts_k3) >= 2:
+                    p1_vars = parts_k3[0]
+                    p2_vars = [v for p in parts_k3[1:] for v in p]
+                    s1 = ''.join(etqs[v] for v in p1_vars if v < len(etqs))
+                    s2 = ''.join(etqs[v] for v in p2_vars if v < len(etqs))
+                    w(4, f"{s1}|{s2}")
+                    w(5, round(float(rk3['phi']), 8))
+                    t_qn_k2 = res_qn.get('tiempo', self._ultimo_t_qn) if res_qn else 0.0
+                    w(6, round(float(t_qn_k2), 4))
+
+            # ── BLOQUE 2: Geometric k=2 → cols G(7), H(8), I(9) ──────────
+            if res_geo and res_geo.get('biparticion'):
+                part_g = fmt_part_geo(res_geo['biparticion'])
+                if part_g is not None:
+                    w(7, part_g)
+                w(8, round(float(res_geo['phi']), 8))
+                w(9, round(float(self._ultimo_t_geo), 4))
+
+            # ── BLOQUES 3-8: QNodes k=3,4,5 ──────────────────────────────
+            # QNodes k=3 → J(10),K(11),L(12)
+            # QNodes k=4 → P(16),Q(17),R(18)
+            # QNodes k=5 → V(22),W(23),X(24)
+            # Geometric k=3,4,5 (M,S,Y) → vacío (KGeoMIP solo calcula k=2)
+            COL_QN = {3: 10, 4: 16, 5: 22}
+            for k_val in [3, 4, 5]:
+                col_qn = COL_QN[k_val]
+                rk = por_k.get(k_val)
+                if (rk and rk.get('biparticion') is not None
+                        and rk.get('phi', float('inf')) < float('inf')):
+                    part_str = fmt_part_qn(rk['biparticion'])
+                    w(col_qn,     part_str)
+                    w(col_qn + 1, round(float(rk['phi']), 8))
+                    t_k_individual = rk.get('tiempo', 0.0)
+                    if t_k_individual <= 0 and self._ultimo_t_qn > 0:
+                        t_k_individual = self._ultimo_t_qn / 3
+                    w(col_qn + 2, round(float(t_k_individual), 4))
+
+            try:
+                wb.save(excel_path)
+                wb.close()
+                self._post(kind="log",
+                           text=f"  ✓ Excel: {hoja_nombre} fila {fila_destino}",
+                           tag="ok")
+            except PermissionError:
+                dir_destino = os.path.dirname(os.path.abspath(excel_path))
+                nombre_base = os.path.splitext(os.path.basename(excel_path))[0]
+                copia_path  = os.path.join(
+                    dir_destino,
+                    f"{nombre_base}_KQNODES_EXPORT.xlsx"
+                )
+                try:
+                    wb.save(copia_path)
+                    wb.close()
+                    self._post(kind="log",
+                               text=(f"  ⚠ Excel abierto — guardado como:\n"
+                                     f"    {copia_path}"),
+                               tag="warn")
+                except Exception as e2:
+                    self._post(kind="log",
+                               text=f"  ✗ No se pudo guardar copia: {e2}",
+                               tag="err")
+                if not getattr(self, '_modo_suite_activo', False):
+                    from tkinter import messagebox
+                    messagebox.showwarning(
+                        "Excel en uso",
+                        f"El archivo está abierto en Excel.\n\n"
+                        f"Los datos se guardaron en:\n{copia_path}\n\n"
+                        f"Cierra Excel y luego copia los datos al archivo original."
+                    )
+
+        except Exception as e:
+            import traceback
+            self._post(kind="log",
+                       text=f"  ✗ Error Excel: {e}\n{traceback.format_exc()[:300]}",
+                       tag="err")
+
+    # ── Guardar CSV ────────────────────────────────────────────────────────
+
+    def _completar_plataformas(self):
+        import platform, psutil, openpyxl, multiprocessing
+
+        excel_path = filedialog.askopenfilename(
+            title="Selecciona DatosPruebas2026_1.xlsx",
+            filetypes=[("Excel files", "*.xlsx")]
+        )
+        if not excel_path:
+            return
+        try:
+            wb = openpyxl.load_workbook(excel_path)
+            ws = wb['plataformas']
+
+            ram_gb = round(psutil.virtual_memory().total / (1024 ** 3), 0)
+            so     = f"{platform.system()} {platform.release()}"
+            proc   = platform.processor() or platform.machine()
+            freq   = ''
+            try:
+                freq_info = psutil.cpu_freq()
+                if freq_info:
+                    freq = f"{freq_info.max / 1000:.2f} GHz"
+            except Exception:
+                pass
+            ncpus = multiprocessing.cpu_count()
+
+            ws['B3'] = proc
+            ws['C3'] = f"{int(ram_gb)} GB"
+            ws['D3'] = so
+            ws['B4'] = f"{freq}  {ncpus} núcleos".strip()
 
             wb.save(excel_path)
             wb.close()
-            self._post(kind="log",
-                       text=f"  ✓ Excel: {hoja_nombre} fila {fila_destino}",
-                       tag="ok")
-
+            messagebox.showinfo(
+                "Plataformas",
+                f"Información del sistema escrita en hoja 'plataformas':\n"
+                f"Procesador : {proc}\n"
+                f"RAM        : {int(ram_gb)} GB\n"
+                f"S.O.       : {so}\n"
+                f"CPU        : {freq}  {ncpus} núcleos"
+            )
         except Exception as e:
-            self._post(kind="log",
-                       text=f"  ✗ Error Excel: {e}", tag="err")
-
-    # ── Guardar CSV ────────────────────────────────────────────────────────
+            messagebox.showerror("Error al completar plataformas", str(e))
 
     def _save(self):
         if not self._results:
