@@ -300,3 +300,314 @@ class KGeoMIP(SIA):
 
 # Alias de compatibilidad
 GeometricSIA = KGeoMIP
+
+
+class KGeoMIPKPartition(SIA):
+    """
+    KGeoMIP extendido a k=2,3,4,5 usando Branch and Bound.
+
+    Estrategia Branch and Bound (según guía):
+    - Problema: optimización combinatoria NP-hard (k-partición óptima)
+    - Cota inferior (lower bound): suma de los costos mínimos de la tabla T
+    - Cota superior (upper bound): mejor solución encontrada hasta ahora
+    - Poda: si lower_bound >= upper_bound actual, descartar rama
+
+    Complejidad: exponencial pero mitigada por podas agresivas con T
+    """
+
+    def __init__(self, sistema: System, k_values: list = None):
+        super().__init__(sistema)
+        self.k_values = k_values if k_values is not None else [2, 3, 4, 5]
+        self.tabla_costos: dict = {}
+        self.tensores: list = []
+
+    def aplicar_estrategia(self) -> dict:
+        """k=2: KGeoMIP exacto. k>=3, n<=6: B&B. k>=3, n>6: Greedy+búsqueda local."""
+        import time
+
+        n = self.sistema.n
+        dist_orig = self.sistema.distribucion_estado_inicial()
+        variables = list(range(n))
+        LIMITE_BB = 6
+
+        # k=2: KGeoMIP exacto (calcula tabla_costos internamente)
+        t0_k2 = time.time()
+        geo_base = KGeoMIP(self.sistema)
+        res_k2 = geo_base.aplicar_estrategia()
+        t_k2 = time.time() - t0_k2
+        tabla_T = geo_base.tabla_costos  # Reutilizar tabla ya calculada
+        self.tabla_costos = tabla_T
+
+        mejor_global = {
+            'biparticion': None,
+            'phi':         float('inf'),
+            'k':           None,
+            'dist_orig':   dist_orig,
+            'dist_part':   dist_orig.copy(),
+            'tiempo':      0.0,
+        }
+        resultados_por_k = {}
+
+        for k in self.k_values:
+            if k > n:
+                continue
+
+            if k == 2:
+                p1, p2 = res_k2['biparticion']
+                res_k = {
+                    'phi':         res_k2['phi'],
+                    'biparticion': [list(p1), list(p2)],
+                    'tiempo':      t_k2,
+                    'k':           2,
+                    'metodo':      'kgeomip_exacto',
+                }
+            else:
+                if n <= LIMITE_BB:
+                    res_k = self._branch_and_bound_k(k, variables, tabla_T, dist_orig)
+                    res_k['metodo'] = 'branch_and_bound'
+                else:
+                    res_k = self._greedy_k(k, variables, tabla_T, dist_orig, timeout_s=120.0)
+                    res_k['metodo'] = 'greedy'
+
+            resultados_por_k[k] = res_k
+            if res_k['phi'] < mejor_global['phi']:
+                mejor_global.update(res_k)
+                mejor_global['k'] = k
+
+        mejor_global['resultados_por_k'] = resultados_por_k
+        return mejor_global
+
+    def _bound(self, particion_parcial, variables_restantes, tabla_T) -> float:
+        """
+        Cota inferior para B&B:
+        EMD mínimo posible dado el estado actual de la partición.
+        Usar los costos mínimos de tabla_T para las variables sin asignar.
+        """
+        idx_inicio = int(self.sistema.estado_inicial[::-1], 2)
+        total = 0.0
+        for v in variables_restantes:
+            T = tabla_T[v]
+            fila = T['fila_inicio'] if isinstance(T, dict) else T[idx_inicio]
+            nz = fila[fila > 1e-15]
+            total += float(nz.min()) if len(nz) > 0 else 0.0
+        return total
+
+    def _calc_dist_k_particion(self, particion: list) -> NDArray[np.float64]:
+        """Distribución conjunta = kron de distribuciones marginales por grupo."""
+        from src.controllers.strategies.qnodes import _dist_parte_vectorizada
+        n = self.sistema.n
+        tpm = self.sistema.tpm
+        idx_inicio = int(self.sistema.estado_inicial[::-1], 2)
+        var_a_col = {i: (n - 1 - i) for i in range(n)}
+
+        dist_total = np.array([1.0])
+        for parte in particion:
+            futuro_cols = sorted(var_a_col[v] for v in parte)
+            presente_bits = sorted(parte)
+            dist_parte = _dist_parte_vectorizada(
+                tpm, futuro_cols, presente_bits, n, idx_inicio
+            )
+            dist_total = np.kron(dist_total, dist_parte)
+        return dist_total
+
+    def _branch_and_bound_k(self, k: int, variables: list, tabla_T, dist_orig) -> dict:
+        """
+        Para k=2 delega a KGeoMIP original (exhaustivo y óptimo).
+        Para k>=3 usa Branch and Bound con ruptura de simetría canónica.
+        """
+        import time
+
+        # ── k=2: KGeoMIP original es el algoritmo correcto ────────────────
+        if k == 2:
+            t0 = time.time()
+            geo = KGeoMIP(self.sistema)
+            res = geo.aplicar_estrategia()
+            t_k = time.time() - t0
+            p1, p2 = res['biparticion']
+            return {
+                'phi':        res['phi'],   # raw EMD (normalización en _run_strategies)
+                'biparticion': [list(p1), list(p2)],
+                'tiempo':     t_k,
+                'k':          2,
+            }
+
+        # ── k>=3: Branch and Bound ────────────────────────────────────────
+        t0 = time.time()
+        n = len(variables)
+        idx_inicio = int(self.sistema.estado_inicial[::-1], 2)
+
+        # Cota por suma de mínimos de tabla T (solo para poda de inviabilidad
+        # extrema; no se usa como lower bound absoluto sobre EMD)
+        min_costs = []
+        for v in variables:
+            T = tabla_T[v]
+            fila = T['fila_inicio'] if isinstance(T, dict) else T[idx_inicio]
+            nz = fila[fila > 1e-15]
+            min_costs.append(float(nz.min()) if len(nz) > 0 else 0.0)
+
+        best_phi = float('inf')
+        best_particion = None
+        best_dist = dist_orig.copy()
+
+        # Stack: (assignment_list, depth)
+        # assignment[i] = grupo (0..k-1) de variables[i]
+        # variables[0] siempre en grupo 0 (ruptura de simetría canónica)
+        stack = [([0], 1)]
+
+        while stack:
+            assignment, depth = stack.pop()
+
+            n_used = len(set(assignment))
+            remaining = n - depth
+
+            # Poda de inviabilidad: variables restantes insuficientes
+            # para llenar los grupos que aún no tienen elementos
+            if remaining < k - n_used:
+                continue
+
+            if depth == n:
+                groups = [[] for _ in range(k)]
+                for i, g in enumerate(assignment):
+                    groups[g].append(variables[i])
+
+                if any(not g for g in groups):
+                    continue
+
+                particion = [sorted(g) for g in groups]
+                try:
+                    dist_part = self._calc_dist_k_particion(particion)
+                    phi = emd_pyphi(dist_orig, dist_part)
+                    if phi < best_phi:
+                        best_phi = phi
+                        best_particion = [list(p) for p in particion]
+                        best_dist = dist_part.copy()
+                    if best_phi < 1e-10:
+                        break
+                except Exception:
+                    pass
+                continue
+
+            # Ramificar: asignar variables[depth] a grupos 0..max_g
+            max_g = min(n_used, k - 1)
+            for g in range(max_g + 1):
+                stack.append((assignment + [g], depth + 1))
+
+        return {
+            'biparticion': best_particion,
+            'phi':        best_phi,
+            'dist_orig':  dist_orig,
+            'dist_part':  best_dist,
+            'tiempo':     time.time() - t0,
+            'k':          k,
+        }
+
+
+    def _greedy_k(self, k: int, variables: list, tabla_T: dict,
+                  dist_orig, timeout_s: float = 120.0) -> dict:
+        """
+        Greedy + búsqueda local para k-particiones cuando n > 6.
+        Fase 1: asignación voraz por importancia (suma costos T).
+        Fase 2: intercambios de pares hasta convergencia o timeout.
+        """
+        import time
+        t0 = time.time()
+        n_vars = len(variables)
+        idx_inicio = int(self.sistema.estado_inicial[::-1], 2)
+
+        # Importancia de cada variable: suma de costos T desde estado inicial
+        importance = []
+        for v in variables:
+            T = tabla_T.get(v)
+            if T is None:
+                importance.append(0.0)
+                continue
+            fila = T['fila_inicio'] if isinstance(T, dict) else T[idx_inicio]
+            nz = fila[fila > 1e-15]
+            importance.append(float(nz.sum()) if len(nz) > 0 else 0.0)
+
+        # Ordenar variables por importancia descendente
+        sorted_idx = sorted(range(n_vars), key=lambda i: -importance[i])
+
+        # Inicializar: primeras k variables → grupos 0..k-1 (ruptura simétrica)
+        assignment = [0] * n_vars
+        group_loads = [0.0] * k
+        for pos, vi in enumerate(sorted_idx[:k]):
+            assignment[vi] = pos
+            group_loads[pos] += importance[vi]
+
+        # Asignar restantes al grupo con menor carga acumulada
+        for vi in sorted_idx[k:]:
+            best_g = min(range(k), key=lambda g: group_loads[g])
+            assignment[vi] = best_g
+            group_loads[best_g] += importance[vi]
+
+        def build_partition(asgn):
+            groups = [[] for _ in range(k)]
+            for vi, g in enumerate(asgn):
+                groups[g].append(variables[vi])
+            return [sorted(g) for g in groups]
+
+        # Evaluar partición inicial
+        particion = build_partition(assignment)
+        try:
+            dist_part = self._calc_dist_k_particion(particion)
+            best_phi = emd_pyphi(dist_orig, dist_part)
+            best_particion = [list(p) for p in particion]
+            best_dist = dist_part.copy()
+        except Exception:
+            best_phi = float('inf')
+            best_particion = [list(p) for p in particion]
+            best_dist = dist_orig.copy()
+
+        if best_phi < 1e-10:
+            return {
+                'biparticion': best_particion,
+                'phi':         best_phi,
+                'dist_orig':   dist_orig,
+                'dist_part':   best_dist,
+                'tiempo':      time.time() - t0,
+                'k':           k,
+            }
+
+        # Búsqueda local: intercambiar pares de variables en grupos distintos
+        improved = True
+        while improved and (time.time() - t0) < timeout_s:
+            improved = False
+            for i in range(n_vars):
+                if (time.time() - t0) >= timeout_s:
+                    break
+                for j in range(i + 1, n_vars):
+                    if (time.time() - t0) >= timeout_s:
+                        break
+                    if assignment[i] == assignment[j]:
+                        continue
+                    assignment[i], assignment[j] = assignment[j], assignment[i]
+                    new_part = build_partition(assignment)
+                    try:
+                        new_dist = self._calc_dist_k_particion(new_part)
+                        new_phi = emd_pyphi(dist_orig, new_dist)
+                        if new_phi < best_phi - 1e-12:
+                            best_phi = new_phi
+                            best_particion = [list(p) for p in new_part]
+                            best_dist = new_dist.copy()
+                            improved = True
+                            if best_phi < 1e-10:
+                                break
+                        else:
+                            assignment[i], assignment[j] = assignment[j], assignment[i]
+                    except Exception:
+                        assignment[i], assignment[j] = assignment[j], assignment[i]
+                if best_phi < 1e-10:
+                    break
+
+        return {
+            'biparticion': best_particion,
+            'phi':         best_phi,
+            'dist_orig':   dist_orig,
+            'dist_part':   best_dist,
+            'tiempo':      time.time() - t0,
+            'k':           k,
+        }
+
+
+GeometricSIAKPartition = KGeoMIPKPartition

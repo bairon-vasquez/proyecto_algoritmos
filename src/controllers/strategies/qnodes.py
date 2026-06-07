@@ -131,35 +131,42 @@ class KQNodes(SIA):
 
     def aplicar_estrategia(self) -> dict:
         """
-        Busca la k-partición óptima para k=3, 4, 5.
+        n<=7: exacto (Stirling). n>7: greedy+búsqueda local con timeout.
         Retorna el mejor resultado global y los resultados por k.
         """
-        n           = self.n
-        idx_inicio  = int(self.sistema.estado_inicial[::-1], 2)
-        dist_orig   = self.sistema.distribucion_estado_inicial()
-        variables   = list(range(n))
+        import time
+        n         = self.n
+        dist_orig = self.sistema.distribucion_estado_inicial()
+        variables = list(range(n))
 
-        # Pre-computar distribuciones de variables individuales
-        # (usadas como base para construir el caché de subconjuntos)
         self._cache_dist = {}
 
         mejor_global = {
             'biparticion': None,
-            'phi': float('inf'),
-            'phi_raw': float('inf'),
-            'k': None,
-            'dist_orig': dist_orig,
-            'dist_part': dist_orig.copy(),
-            'tiempo': 0.0
+            'phi':         float('inf'),
+            'phi_raw':     float('inf'),
+            'k':           None,
+            'dist_orig':   dist_orig,
+            'dist_part':   dist_orig.copy(),
+            'tiempo':      0.0,
         }
         resultados_por_k = {}
 
-        for k in [3, 4, 5]:
+        for k in [2, 3, 4, 5]:
             if k > n:
                 continue
-            res_k = self._buscar_k_particion(
-                k, variables, idx_inicio, dist_orig
-            )
+            # k=2 exacto hasta n=20 (S(n,2)=2^(n-1)-1, manejable)
+            # k>=3 exacto solo para n<=7
+            usar_exacto = (k == 2 and n <= 20) or (k >= 3 and n <= 7)
+            if usar_exacto:
+                res_k = self._buscar_k_particion_exacto(
+                    k, variables, dist_orig
+                )
+                res_k['metodo'] = 'exacto_stirling'
+            else:
+                res_k = self._greedy_k_qnodes(
+                    k, variables, dist_orig, timeout_s=90.0
+                )
             resultados_por_k[k] = res_k
 
             if res_k['phi'] < mejor_global['phi']:
@@ -167,18 +174,18 @@ class KQNodes(SIA):
                 mejor_global['k'] = k
 
         mejor_global['resultados_por_k'] = resultados_por_k
+        mejor_global['por_k'] = resultados_por_k  # alias de compatibilidad
         return mejor_global
 
     # ==================================================================
     # BÚSQUEDA DE k-PARTICIÓN CON MEMOIZACIÓN
     # ==================================================================
 
-    def _buscar_k_particion(
+    def _buscar_k_particion_exacto(
         self,
-        k:          int,
-        variables:  list[int],
-        idx_inicio: int,
-        dist_orig:  NDArray[np.float64]
+        k:         int,
+        variables: list[int],
+        dist_orig: NDArray[np.float64]
     ) -> dict:
         """
         Evalúa todas las S(n,k) k-particiones usando memoización de
@@ -188,8 +195,11 @@ class KQNodes(SIA):
         el mismo subconjunto de variables produce siempre la misma
         distribución marginal, independientemente de la partición.
         """
-        n       = self.n
-        tpm     = self.sistema.tpm
+        import time
+        t0         = time.time()
+        n          = self.n
+        tpm        = self.sistema.tpm
+        idx_inicio = int(self.sistema.estado_inicial[::-1], 2)
 
         mejor_phi       = float('inf')
         mejor_particion = None
@@ -230,7 +240,7 @@ class KQNodes(SIA):
             'phi_raw':     mejor_phi * n,   # valor absoluto
             'dist_orig':   dist_orig,
             'dist_part':   mejor_dist,
-            'tiempo':      0.0
+            'tiempo':      time.time() - t0,
         }
 
     # ==================================================================
@@ -271,6 +281,111 @@ class KQNodes(SIA):
             dist_total = np.kron(dist_total, self._cache_dist[clave])
 
         return dist_total
+
+    # ==================================================================
+    # GREEDY + BÚSQUEDA LOCAL (n > 7)
+    # ==================================================================
+
+    def _greedy_k_qnodes(self, k: int, variables: list,
+                         dist_orig, timeout_s: float = 90.0) -> dict:
+        """
+        Greedy + búsqueda local para KQNodes cuando n > 7.
+
+        Fase 1 (movimientos): mover variables entre grupos si baja phi.
+        Fase 2 (intercambios): intercambiar pares entre grupos si baja phi.
+        Usa _dist_k_particion_memo para aprovechar el caché de marginales.
+        """
+        import time
+        t0     = time.time()
+        n_full = self.n
+        tpm    = self.sistema.tpm
+        idx_inicio = int(self.sistema.estado_inicial[::-1], 2)
+
+        def calcular_phi(grupos):
+            if any(not g for g in grupos):
+                return float('inf')
+            try:
+                dist_part = self._dist_k_particion_memo(
+                    grupos, tpm, n_full, idx_inicio
+                )
+                phi_raw = emd_pyphi(dist_orig, dist_part)
+                return phi_raw / n_full if n_full > 0 else 0.0
+            except Exception:
+                return float('inf')
+
+        # Inicializar: distribución round-robin de las variables
+        grupos = [[] for _ in range(k)]
+        for i, v in enumerate(variables):
+            grupos[i % k].append(v)
+
+        phi_actual = calcular_phi(grupos)
+
+        # Fase 1: mover una variable a la vez
+        mejorado = True
+        iters    = 0
+        while mejorado and (time.time() - t0) < timeout_s * 0.6:
+            mejorado = False
+            iters += 1
+            if iters > 50:
+                break
+            for g_src in range(k):
+                if len(grupos[g_src]) <= 1:
+                    continue
+                for v in list(grupos[g_src]):
+                    for g_dst in range(k):
+                        if g_dst == g_src:
+                            continue
+                        nuevos = [list(g) for g in grupos]
+                        nuevos[g_src].remove(v)
+                        nuevos[g_dst].append(v)
+                        phi_n = calcular_phi(nuevos)
+                        if phi_n < phi_actual - 1e-9:
+                            grupos     = nuevos
+                            phi_actual = phi_n
+                            mejorado   = True
+                            break
+                    if mejorado:
+                        break
+                if mejorado:
+                    break
+
+        # Fase 2: intercambiar pares de variables entre grupos
+        swap_mejorado = True
+        while swap_mejorado and (time.time() - t0) < timeout_s * 0.9:
+            swap_mejorado = False
+            for g1 in range(k):
+                if swap_mejorado:
+                    break
+                for g2 in range(g1 + 1, k):
+                    if swap_mejorado:
+                        break
+                    for v1 in list(grupos[g1]):
+                        if swap_mejorado:
+                            break
+                        for v2 in list(grupos[g2]):
+                            if (time.time() - t0) > timeout_s * 0.9:
+                                break
+                            nuevos = [list(g) for g in grupos]
+                            nuevos[g1].remove(v1)
+                            nuevos[g1].append(v2)
+                            nuevos[g2].remove(v2)
+                            nuevos[g2].append(v1)
+                            phi_n = calcular_phi(nuevos)
+                            if phi_n < phi_actual - 1e-9:
+                                grupos        = nuevos
+                                phi_actual    = phi_n
+                                swap_mejorado = True
+                                break
+
+        return {
+            'biparticion': [sorted(g) for g in grupos],
+            'phi':         phi_actual,
+            'phi_raw':     phi_actual * n_full,
+            'dist_orig':   dist_orig,
+            'dist_part':   dist_orig.copy(),
+            'tiempo':      time.time() - t0,
+            'metodo':      'greedy_qnodes',
+        }
 
     # ==================================================================
     # IMPRESIÓN DE RESULTADOS

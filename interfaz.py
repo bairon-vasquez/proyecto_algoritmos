@@ -10,6 +10,7 @@ import os
 import csv
 import sys
 import queue
+import concurrent.futures
 from math import comb, factorial
 from datetime import datetime
 
@@ -17,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
     from src.models.system import System
-    from src.controllers.strategies.geometric import KGeoMIP
+    from src.controllers.strategies.geometric import KGeoMIP, KGeoMIPKPartition
     from src.controllers.strategies.qnodes import KQNodes
     MODULES_OK = True
     MODULES_ERROR = None
@@ -180,8 +181,9 @@ class App(tk.Tk):
         self._excel_rows: list = []
         self._prueba_counter: int = 0
         # Referencias a los últimos resultados (usadas por exportar_a_excel)
-        self._ultimo_res_geo   = None
-        self._ultimo_res_qn    = None
+        self._ultimo_res_geo      = None
+        self._ultimo_res_geo_full = None
+        self._ultimo_res_qn       = None
         self._ultimo_sub       = None
         self._ultimo_t_geo     = 0.0
         self._ultimo_t_qn      = 0.0
@@ -841,23 +843,25 @@ class App(tk.Tk):
             return
 
         # Guardar estado actual de _ultimo_* para restaurar después
-        saved_geo  = self._ultimo_res_geo
-        saved_qn   = self._ultimo_res_qn
-        saved_sub  = self._ultimo_sub
-        saved_tgeo = self._ultimo_t_geo
-        saved_tqn  = self._ultimo_t_qn
-        saved_n    = self._ultimo_n_sistema
+        saved_geo      = self._ultimo_res_geo
+        saved_geo_full = self._ultimo_res_geo_full
+        saved_qn       = self._ultimo_res_qn
+        saved_sub      = self._ultimo_sub
+        saved_tgeo     = self._ultimo_t_geo
+        saved_tqn      = self._ultimo_t_qn
+        saved_n        = self._ultimo_n_sistema
 
         errores = 0
         for entrada in self._historial_analisis:
             try:
                 # Establecer _ultimo_* desde la entrada del historial
-                self._ultimo_res_geo   = entrada['res_geo']
-                self._ultimo_res_qn    = entrada['res_qn']
-                self._ultimo_sub       = entrada['sub']
-                self._ultimo_t_geo     = entrada['t_geo']
-                self._ultimo_t_qn      = entrada['t_qn']
-                self._ultimo_n_sistema = entrada['n_sistema']
+                self._ultimo_res_geo      = entrada['res_geo']
+                self._ultimo_res_geo_full = entrada.get('res_geo_full')
+                self._ultimo_res_qn       = entrada['res_qn']
+                self._ultimo_sub          = entrada['sub']
+                self._ultimo_t_geo        = entrada['t_geo']
+                self._ultimo_t_qn         = entrada['t_qn']
+                self._ultimo_n_sistema    = entrada['n_sistema']
                 self._exportar_a_excel_path(
                     excel_path,
                     entrada['alcance'],
@@ -868,12 +872,13 @@ class App(tk.Tk):
                 errores += 1
 
         # Restaurar estado original
-        self._ultimo_res_geo   = saved_geo
-        self._ultimo_res_qn    = saved_qn
-        self._ultimo_sub       = saved_sub
-        self._ultimo_t_geo     = saved_tgeo
-        self._ultimo_t_qn      = saved_tqn
-        self._ultimo_n_sistema = saved_n
+        self._ultimo_res_geo      = saved_geo
+        self._ultimo_res_geo_full = saved_geo_full
+        self._ultimo_res_qn       = saved_qn
+        self._ultimo_sub          = saved_sub
+        self._ultimo_t_geo        = saved_tgeo
+        self._ultimo_t_qn         = saved_tqn
+        self._ultimo_n_sistema    = saved_n
 
         total = len(self._historial_analisis)
         messagebox.showinfo(
@@ -1222,14 +1227,15 @@ class App(tk.Tk):
                         self._generar_analisis(res_geo_vacio, res_qn_vacio, sub, 0.0, 0.0)
                         self._agregar_fila_excel(res_geo_vacio, res_qn_vacio, sub, _alc, _mec)
                         self._historial_analisis.append({
-                            'alcance':   _alc,
-                            'mecanismo': _mec,
-                            'n_sistema': _n_sis,
-                            'res_geo':   res_geo_vacio,
-                            'res_qn':    res_qn_vacio,
-                            'sub':       sub,
-                            't_geo':     0.0,
-                            't_qn':      0.0,
+                            'alcance':      _alc,
+                            'mecanismo':    _mec,
+                            'n_sistema':    _n_sis,
+                            'res_geo':      res_geo_vacio,
+                            'res_geo_full': None,
+                            'res_qn':       res_qn_vacio,
+                            'sub':          sub,
+                            't_geo':        0.0,
+                            't_qn':         0.0,
                         })
                         self._post(kind="log",
                                    text="\n✅ Completado (φ = 0, intersección vacía)",
@@ -1262,11 +1268,12 @@ class App(tk.Tk):
 
             # Actualizar _ultimo_* directamente desde el hilo de análisis
             if geo_res or qnod_res:
-                self._ultimo_res_geo = geo_res
-                self._ultimo_res_qn  = qnod_res
-                self._ultimo_sub     = sub
-                self._ultimo_t_geo   = geo_res["tiempo"]  if geo_res  else 0.0
-                self._ultimo_t_qn    = qnod_res["tiempo"] if qnod_res else 0.0
+                self._ultimo_res_geo      = geo_res
+                self._ultimo_res_geo_full = geo_res if geo_res else None
+                self._ultimo_res_qn       = qnod_res
+                self._ultimo_sub          = sub
+                self._ultimo_t_geo        = geo_res["tiempo"]  if geo_res  else 0.0
+                self._ultimo_t_qn         = qnod_res["tiempo"] if qnod_res else 0.0
 
         except Exception as exc:
             import traceback
@@ -1274,15 +1281,16 @@ class App(tk.Tk):
             self._post(kind="log", text=traceback.format_exc(), tag="err")
             # Registrar en historial con resultado vacío para mantener numeración
             self._historial_analisis.append({
-                'alcance':   alcance,
-                'mecanismo': mec,
-                'n_sistema': self._ultimo_n_sistema,
-                'res_geo':   None,
-                'res_qn':    None,
-                'sub':       None,
-                't_geo':     0.0,
-                't_qn':      0.0,
-                'error':     str(exc),
+                'alcance':      alcance,
+                'mecanismo':    mec,
+                'n_sistema':    self._ultimo_n_sistema,
+                'res_geo':      None,
+                'res_geo_full': None,
+                'res_qn':       None,
+                'sub':          None,
+                't_geo':        0.0,
+                't_qn':         0.0,
+                'error':        str(exc),
             })
             done_event.set()
             return done_event
@@ -1305,14 +1313,15 @@ class App(tk.Tk):
                 self._generar_analisis(_geo, _qnod, _sub, _t_geo, _t_qn)
                 self._agregar_fila_excel(_geo, _qnod, _sub, _alc, _mec)
                 self._historial_analisis.append({
-                    'alcance':    _alc,
-                    'mecanismo':  _mec,
-                    'n_sistema':  _n_sis,
-                    'res_geo':    _geo,
-                    'res_qn':     _qnod,
-                    'sub':        _sub,
-                    't_geo':      _t_geo,
-                    't_qn':       _t_qn,
+                    'alcance':      _alc,
+                    'mecanismo':    _mec,
+                    'n_sistema':    _n_sis,
+                    'res_geo':      _geo,
+                    'res_geo_full': _geo,
+                    'res_qn':       _qnod,
+                    'sub':          _sub,
+                    't_geo':        _t_geo,
+                    't_qn':         _t_qn,
                 })
             self._post(kind="log",
                        text=f"\n✅ Completado en {elapsed:.2f}s", tag="ok")
@@ -1329,34 +1338,86 @@ class App(tk.Tk):
         def label(idx_list):
             return "".join(etqs[i] for i in idx_list) if idx_list else "∅"
 
+        def _con_timeout(fn, timeout_s=600):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(fn)
+                try:
+                    return fut.result(timeout=timeout_s)
+                except concurrent.futures.TimeoutError:
+                    return None
+
         geo_res = qnod_res = None
 
-        # ── KGeoMIP ──────────────────────────────────────────────────────
+        # ── KGeoMIP k=2,3,4,5 (Branch and Bound) ────────────────────────
         if usar_geo:
             self._post(kind="status",
-                       text=f"Ejecutando KGeoMIP (n={n})…")
+                       text=f"Ejecutando KGeoMIP k=2,3,4,5 (n={n})…")
             self._post(kind="log",
-                       text=f"\n▶ KGeoMIP k=2  (n={n})", tag="ok")
+                       text=f"\n▶ KGeoMIP k=2,3,4,5  (n={n})", tag="ok")
             t0 = time.time()
             try:
-                res     = KGeoMIP(sub).aplicar_estrategia()
-                elapsed = time.time() - t0
-                phi_raw = res["phi"]
-                phi     = phi_raw / n if n > 0 else 0.0
-                p1, p2  = res["biparticion"]
-                part    = f"[{label(p1)}] | [{label(p2)}]"
+                k_vals   = [2, 3, 4, 5] if n <= 20 else [2]
+                res_full  = _con_timeout(
+                    lambda: KGeoMIPKPartition(
+                        sub, k_values=k_vals).aplicar_estrategia(),
+                    timeout_s=600
+                )
+                elapsed   = time.time() - t0
+                if res_full is None:
+                    raise RuntimeError("KGeoMIP excedió límite de 600s")
+                res_por_k = res_full.get('resultados_por_k', {})
+
+                # Normalizar phi / n para cada k
+                resultados_norm = {}
+                for k_val, rk in res_por_k.items():
+                    if rk and rk.get('biparticion') is not None:
+                        phi_raw_k = rk.get('phi', float('inf'))
+                        resultados_norm[k_val] = {
+                            'phi':         phi_raw_k / n if n > 0 else 0.0,
+                            'phi_raw':     phi_raw_k,
+                            'biparticion': rk.get('biparticion'),
+                            'tiempo':      rk.get('tiempo', elapsed),
+                        }
+
+                # k=2 para compatibilidad con el resto de la interfaz
+                rk2      = resultados_norm.get(2, {})
+                phi2     = rk2.get('phi', float('inf'))
+                phi_raw2 = rk2.get('phi_raw', phi2)
+                bip2     = rk2.get('biparticion') or [[], []]
+                p1       = bip2[0] if len(bip2) > 0 else []
+                p2       = bip2[1] if len(bip2) > 1 else []
+                part     = f"[{label(p1)}] | [{label(p2)}]"
 
                 self._post(kind="log",
-                           text=f"  φ = {phi:.6f}  (raw={phi_raw:.4f})"
+                           text=f"  k=2: φ = {phi2:.6f}  (raw={phi_raw2:.4f})"
                                 f"  t = {elapsed:.3f}s", tag="ok")
                 self._post(kind="log", text=f"  Partición: {part}")
                 self._post(kind="row",
                            values=("KGeoMIP", "2", part,
-                                   f"{phi:.6f}", f"{elapsed:.3f}"))
-                geo_res = {"phi": phi, "phi_raw": phi_raw,
-                           "p1": p1, "p2": p2, "part": part,
-                           "biparticion": [p1, p2],
-                           "tiempo": elapsed}
+                                   f"{phi2:.6f}", f"{elapsed:.3f}"))
+
+                for k_val in [3, 4, 5]:
+                    rk = resultados_norm.get(k_val)
+                    if not rk or rk.get('biparticion') is None:
+                        continue
+                    phi_k  = rk['phi']
+                    parts  = rk['biparticion']
+                    part_k = " | ".join(
+                        "{" + label(p) + "}" for p in parts)
+                    self._post(kind="row",
+                               values=("KGeoMIP", f"{k_val}", part_k,
+                                       f"{phi_k:.6f}", f"{elapsed:.3f}"))
+
+                geo_res = {
+                    "phi":              phi2,
+                    "phi_raw":          phi_raw2,
+                    "p1":               p1,
+                    "p2":               p2,
+                    "part":             part,
+                    "biparticion":      [p1, p2],
+                    "tiempo":           elapsed,
+                    "resultados_por_k": resultados_norm,
+                }
             except Exception as e:
                 self._post(kind="log", text=f"  ❌ Error: {e}", tag="err")
 
@@ -1368,8 +1429,13 @@ class App(tk.Tk):
                        text=f"\n▶ KQNodes k=3,4,5  (n={n})", tag="ok")
             t0 = time.time()
             try:
-                res     = KQNodes(sub).aplicar_estrategia()
+                res = _con_timeout(
+                    lambda: KQNodes(sub).aplicar_estrategia(),
+                    timeout_s=600
+                )
                 elapsed = time.time() - t0
+                if res is None:
+                    raise RuntimeError("KQNodes excedió límite de 600s")
                 phi     = res.get("phi", float("inf"))
                 k_opt   = res.get("k", "?")
                 mejor   = res.get("biparticion") or []
@@ -1426,11 +1492,12 @@ class App(tk.Tk):
             t_geo = geo["tiempo"]  if geo  else 0.0
             t_qn  = qnod["tiempo"] if qnod else 0.0
             # Guardar referencias para exportar_a_excel
-            self._ultimo_res_geo   = geo
-            self._ultimo_res_qn    = qnod
-            self._ultimo_sub       = sub
-            self._ultimo_t_geo     = t_geo
-            self._ultimo_t_qn      = t_qn
+            self._ultimo_res_geo      = geo
+            self._ultimo_res_geo_full = geo
+            self._ultimo_res_qn       = qnod
+            self._ultimo_sub          = sub
+            self._ultimo_t_geo        = t_geo
+            self._ultimo_t_qn         = t_qn
             # Capturar n_sistema desde el campo UI (modo manual)
             self._ultimo_n_sistema = len(self._sys_var.get().strip())
             self._ultimo_sistema   = self._sys_var.get().strip()
@@ -1439,14 +1506,15 @@ class App(tk.Tk):
             self._generar_analisis(geo, qnod, sub, t_geo, t_qn)
             self._agregar_fila_excel(geo, qnod, sub, alcance=alc, mec=mec)
             self._historial_analisis.append({
-                'alcance':   alc,
-                'mecanismo': mec,
-                'n_sistema': self._ultimo_n_sistema,
-                'res_geo':   geo,
-                'res_qn':    qnod,
-                'sub':       sub,
-                't_geo':     t_geo,
-                't_qn':      t_qn,
+                'alcance':      alc,
+                'mecanismo':    mec,
+                'n_sistema':    self._ultimo_n_sistema,
+                'res_geo':      geo,
+                'res_geo_full': geo,
+                'res_qn':       qnod,
+                'sub':          sub,
+                't_geo':        t_geo,
+                't_qn':         t_qn,
             })
 
     # ── Generación de análisis → 4 pestañas ───────────────────────────────
@@ -1714,12 +1782,31 @@ class App(tk.Tk):
             else:
                 qn_d[k] = {'part': '—', 'phi': '—', 't': '—'}
 
+        # Geometric k=3,4,5
+        res_geo_full = getattr(self, '_ultimo_res_geo_full', None)
+        por_k_geo    = res_geo_full.get('resultados_por_k', {}) if res_geo_full else {}
+        geo_kn_d     = {}
+        for k in [3, 4, 5]:
+            rk = por_k_geo.get(k, {})
+            if (rk and rk.get('biparticion') is not None
+                    and rk.get('phi', float('inf')) < float('inf')):
+                parts_str = " | ".join(
+                    "{" + lbl(p) + "}" for p in rk['biparticion'])
+                geo_kn_d[k] = {
+                    'part': parts_str,
+                    'phi':  f"{rk['phi']:.6f}",
+                    't':    f"{rk.get('tiempo', 0):.3f}",
+                }
+            else:
+                geo_kn_d[k] = {'part': '—', 'phi': '—', 't': '—'}
+
         self._excel_rows.append({
             'prueba':  self._prueba_counter,
             'alcance': alcance,
             'mec':     mec,
             'geo':     geo_d,
             'qn':      qn_d,
+            'geo_kn':  geo_kn_d,
         })
         self._actualizar_tab_excel()
 
@@ -1763,6 +1850,13 @@ class App(tk.Tk):
                 lines.append(
                     f"{k:>2}  {'KQNodes':<12}  "
                     f"{q['part'][:28]:<28}  {q['phi']:>12}  {q['t']:>10}")
+
+        for k in [3, 4, 5]:
+            gk = r.get('geo_kn', {}).get(k, {'part': '—', 'phi': '—', 't': '—'})
+            if gk['part'] != '—':
+                lines.append(
+                    f"{k:>2}  {'KGeoMIP':<12}  "
+                    f"{gk['part'][:28]:<28}  {gk['phi']:>12}  {gk['t']:>10}")
 
         # ── Historial acumulado (si hay más de un análisis) ───────────────
         if len(self._excel_rows) > 1:
@@ -2097,7 +2191,6 @@ class App(tk.Tk):
             # QNodes k=3 → J(10),K(11),L(12)
             # QNodes k=4 → P(16),Q(17),R(18)
             # QNodes k=5 → V(22),W(23),X(24)
-            # Geometric k=3,4,5 (M,S,Y) → vacío (KGeoMIP solo calcula k=2)
             COL_QN = {3: 10, 4: 16, 5: 22}
             for k_val in [3, 4, 5]:
                 col_qn = COL_QN[k_val]
@@ -2111,6 +2204,21 @@ class App(tk.Tk):
                     if t_k_individual <= 0 and self._ultimo_t_qn > 0:
                         t_k_individual = self._ultimo_t_qn / 3
                     w(col_qn + 2, round(float(t_k_individual), 4))
+
+            # ── BLOQUES Geometric k=3,4,5 → M(13),N(14),O(15) / S(19),T(20),U(21) / Y(25),Z(26),AA(27) ──
+            res_geo_full = getattr(self, '_ultimo_res_geo_full', None)
+            por_k_geo    = res_geo_full.get('resultados_por_k', {}) if res_geo_full else {}
+            GEO_KN_COL   = {3: 13, 4: 19, 5: 25}
+            for k_val in [3, 4, 5]:
+                col_start = GEO_KN_COL[k_val]
+                rk = por_k_geo.get(k_val)
+                if (rk and rk.get('biparticion') is not None
+                        and rk.get('phi', float('inf')) < float('inf')):
+                    parts    = rk['biparticion']
+                    part_str = fmt_part_qn(parts)
+                    w(col_start,     part_str)
+                    w(col_start + 1, round(float(rk['phi']), 8))
+                    w(col_start + 2, round(float(rk.get('tiempo', 0.0)), 4))
 
             try:
                 wb.save(excel_path)

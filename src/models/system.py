@@ -28,15 +28,8 @@ class System:
         self.num_estados = 2 ** self.n
 
     @classmethod
-    def desde_csv(cls, filepath: str, estado_inicial: str) -> "System":
-        """
-        Carga la TPM desde CSV aplicando corrección de orden de columnas.
-
-        El documento etiqueta las columnas como At+1, Bt+1, Ct+1
-        pero la columna 0 del CSV corresponde internamente a la variable
-        de mayor índice (C para n=3). Se invierte el orden de columnas
-        para que la columna i corresponda a la variable i (bit i).
-        """
+    def _desde_csv_numpy(cls, filepath: str, estado_inicial: str) -> "System":
+        """Carga TPM con pandas/numpy. Usado para N<=19 o como fallback de Spark."""
         df = pd.read_csv(filepath, header=None, low_memory=False)
 
         # Detectar y saltar encabezado de texto si existe
@@ -53,11 +46,54 @@ class System:
             tpm_doc = cls._ee_a_nodo(tpm_doc, n)
 
         # Invertir orden de columnas: col_doc_0 -> col_interna_{n-1}, etc.
-        # Esto corrige que el doc usa A=col0 pero internamente A=col{n-1}
         tpm = tpm_doc[:, ::-1].copy()
 
         etiquetas = [chr(ord('A') + i) for i in range(n)]
         return cls(tpm, estado_inicial, etiquetas)
+
+    @classmethod
+    def desde_csv(cls, filepath: str, estado_inicial: str) -> "System":
+        """
+        Carga la TPM desde CSV aplicando corrección de orden de columnas.
+
+        El documento etiqueta las columnas como At+1, Bt+1, Ct+1
+        pero la columna 0 del CSV corresponde internamente a la variable
+        de mayor índice (C para n=3). Se invierte el orden de columnas
+        para que la columna i corresponda a la variable i (bit i).
+
+        Para archivos > 40 MB (N>=20), intenta PySpark automáticamente;
+        si PySpark no está disponible, carga con numpy con advertencia.
+        """
+        import os
+        size_mb = os.path.getsize(filepath) / 1e6 if os.path.exists(filepath) else 0
+
+        if size_mb > 40:
+            try:
+                from src.utils.spark_tpm import SparkTPMLoader, _spark_disponible
+                if _spark_disponible():
+                    print(f"  [Spark] Cargando {filepath} ({size_mb:.0f}MB) con PySpark...")
+                    import csv as _csv
+                    with open(filepath, encoding='utf-8') as f:
+                        primera_fila = next(_csv.reader(f))
+                    # Detectar si la primera fila es texto (encabezado) o datos
+                    try:
+                        [float(x) for x in primera_fila]
+                        n = len(primera_fila)
+                    except ValueError:
+                        # Es encabezado de texto — contar columnas
+                        n = len(primera_fila)
+                    etqs = [chr(ord('A') + i) for i in range(n)]
+                    tpm_placeholder = np.zeros((1, n), dtype=np.float64)
+                    sistema = cls(tpm_placeholder, estado_inicial, etqs)
+                    sistema._spark_path    = filepath
+                    sistema._usa_spark     = True
+                    sistema._spark_size_mb = size_mb
+                    print(f"  [Spark] Sistema N={n} registrado (TPM carga lazy)")
+                    return sistema
+            except Exception as e:
+                print(f"  [Spark] No disponible ({e}), usando numpy")
+
+        return cls._desde_csv_numpy(filepath, estado_inicial)
 
     @staticmethod
     def _ee_a_nodo(tpm_ee: NDArray, n: int) -> NDArray:
@@ -135,7 +171,30 @@ class System:
             (sus estados se promedian; esto ocurre cuando mec ⊃ alc)
         2. Variables fuera del alcance   -> marginalizar columnas (descartar)
             Incluye columnas huérfanas generadas por el paso 1.5.
+
+        Para N>=20 con Spark: delega la construcción al SparkTPMLoader.
         """
+        # Ruta Spark para sistemas grandes (N>=20)
+        if getattr(self, '_usa_spark', False):
+            try:
+                from src.utils.spark_tpm import SparkTPMLoader
+                with SparkTPMLoader() as loader:
+                    tpm_sub = loader.cargar_tpm_subsistema(
+                        filepath       = self._spark_path,
+                        estado_inicial = self.estado_inicial,
+                        alcance_vars   = alcance_vars,
+                        mecanismo_vars = mecanismo_vars,
+                        todas_vars     = self.etiquetas,
+                    )
+                etqs_sub = [v for v in self.etiquetas if v in alcance_vars]
+                return System(tpm_sub, self.estado_inicial, etqs_sub)
+            except Exception as e:
+                print(f"  [Spark] Error en subsistema ({e}), recargando con numpy")
+                sistema_completo = System._desde_csv_numpy(
+                    self._spark_path, self.estado_inicial
+                )
+                return sistema_completo.construir_subsistema(alcance_vars, mecanismo_vars)
+
         # Paso 1: condicionar variables fuera del mecanismo
         fuera_mec_indices = [
             i for i, etq in enumerate(self.etiquetas)
