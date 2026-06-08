@@ -181,76 +181,218 @@ class KGeoMIP(SIA):
         return tabla
 
     # ==================================================================
+    # SIMETRÍAS DEL HIPERCUBO (§2.2.2)
+    # ==================================================================
+
+    def _equiv_classes(self) -> list[list[int]]:
+        """
+        Clases de equivalencia de variables bajo simetrías del hipercubo (§2.2.2).
+
+        Variables i y j son equivalentes (misma tabla de costo T_i = T_j) si:
+          - Permutación:     ||tensor_i - tensor_j||∞ < tol  (misma dinámica)
+          - Complementación: ||tensor_i - (1-tensor_j)||∞ < tol  (dinámica invertida)
+
+        Bajo cualquiera de estas condiciones la tabla BFS produce los mismos
+        costos t(·,·), haciendo equivalentes todas las biparticiones que solo
+        difieran por intercambiar i↔j.
+
+        Retorna lista de grupos ordenados; singletons para variables sin pares.
+        """
+        if not self.tensores:
+            return [[v] for v in range(self.sistema.n)]
+
+        tol = 1e-6
+        n = len(self.tensores)
+        padre = list(range(n))
+
+        def find(x: int) -> int:
+            while padre[x] != x:
+                padre[x] = padre[padre[x]]
+                x = padre[x]
+            return x
+
+        def union(x: int, y: int) -> None:
+            px, py = find(x), find(y)
+            if px != py:
+                padre[max(px, py)] = min(px, py)
+
+        for i in range(n):
+            ti = self.tensores[i]
+            for j in range(i + 1, n):
+                tj = self.tensores[j]
+                if (np.max(np.abs(ti - tj)) < tol or
+                        np.max(np.abs(ti - (1.0 - tj))) < tol):
+                    union(i, j)
+
+        grupos: dict[int, list[int]] = {}
+        for v in range(n):
+            r = find(v)
+            grupos.setdefault(r, []).append(v)
+        return [sorted(g) for g in sorted(grupos.values())]
+
+    # ==================================================================
     # IDENTIFICAR CANDIDATAS
     # ==================================================================
 
     def _identificar_candidatas(self) -> list:
         """
-        Genera biparticiones candidatas a evaluar.
+        Genera biparticiones candidatas a evaluar con reducción por simetrías.
 
         Estrategia 1 (todos los N):
             Costos cero en la tabla T revelan independencia causal.
 
         Estrategia 2 (N <= 15):
-            Todas las biparticiones posibles: C(n,1)+...+C(n,n-1)/2
+            Todas las biparticiones posibles con poda por clases de
+            equivalencia del hipercubo (§2.2.2): dos biparticiones que
+            solo difieran por intercambiar variables equivalentes tienen
+            el mismo Φ y solo se evalúa la forma canónica.
 
         Estrategia 3 (N > 15):
-            Heurística ordenada por suma de costos.
+            Heurística ordenada por suma de costos (sin cambios).
         """
         n = self.sistema.n
         indices = list(range(n))
         candidatas = []
-        vistas = set()
         idx_inicio = int(self.sistema.estado_inicial[::-1], 2)
+
+        # Clases de equivalencia para reducción simétrica
+        equiv_cls = self._equiv_classes()
+        n_no_triviales = sum(1 for c in equiv_cls if len(c) > 1)
+
+        def canonicalizar(p1: list, p2: list) -> tuple:
+            """
+            Forma canónica de {p1|p2} bajo simetrías del hipercubo.
+
+            Para cada clase de equivalencia C, solo importa cuántos elementos
+            de C van a p1 (no cuáles). Los primeros |p1∩C| de C (en orden)
+            representan el grupo canónico en p1.
+
+            La orientación (flip p1↔p2) se normaliza recomputando desde ambos
+            lados y tomando el mínimo lexicográfico, lo que garantiza:
+                canonicalizar(p1,p2) == canonicalizar(p2,p1)
+            """
+            def _directed(pp: list) -> tuple:
+                set_pp = set(pp)
+                cp1, cp2 = [], []
+                for clase in equiv_cls:
+                    en = sum(1 for v in clase if v in set_pp)
+                    cp1.extend(clase[:en])
+                    cp2.extend(clase[en:])
+                return (tuple(sorted(cp1)), tuple(sorted(cp2)))
+
+            return min(_directed(p1), _directed(p2))
+
+        vistas: set = set()
+        n_reducidas = 0
+
+        def agregar(p1: list, p2: list) -> None:
+            nonlocal n_reducidas
+            if not p1 or not p2:
+                return
+            canon = canonicalizar(p1, p2)
+            if canon in vistas:
+                n_reducidas += 1
+                return
+            vistas.add(canon)
+            candidatas.append((list(p1), list(p1), list(p2), list(p2)))
 
         # Obtener fila del estado inicial por variable
         filas = {}
         for v, T in self.tabla_costos.items():
             filas[v] = T['fila_inicio'] if isinstance(T, dict) else T[idx_inicio]
 
-        # Estrategia 1: costos cero como guía
+        # Estrategia 1: costos cero → independencia causal
         for v, fila in filas.items():
             for j, costo in enumerate(fila):
                 if costo < 1e-10 and j != idx_inicio:
                     xor = idx_inicio ^ j
                     bits = sorted([b for b in range(n) if (xor >> b) & 1])
                     rest = sorted([i for i in indices if i not in bits])
-                    if bits and rest:
-                        clave = (tuple(bits), tuple(rest))
-                        if clave not in vistas:
-                            vistas.add(clave)
-                            candidatas.append((bits, bits, rest, rest))
+                    agregar(bits, rest)
 
         if n <= 15:
-            # Estrategia 2: exhaustiva
+            # Estrategia 2: exhaustiva con poda por simetrías
+            n_antes = len(candidatas)
             for tam in range(1, n):
                 for combo in combinations(indices, tam):
                     p1 = sorted(combo)
                     p2 = sorted([i for i in indices if i not in p1])
-                    clave = (tuple(p1), tuple(p2))
-                    if clave not in vistas and (tuple(p2), tuple(p1)) not in vistas:
-                        vistas.add(clave)
-                        candidatas.append((p1, p1, p2, p2))
+                    agregar(p1, p2)
+            if n_no_triviales > 0:
+                sin_sim = sum(
+                    len(list(combinations(indices, t))) for t in range(1, n)
+                ) // 2  # biparticiones unicas sin simetria (solo flip)
+                n_unicas = len(candidatas) - n_antes
+                reducidas = sin_sim - n_unicas
+                print(f"  [Simetria S2.2.2] {n_no_triviales} clase(s) no trivial(es): "
+                      f"{sin_sim} -> {n_unicas} candidatas unicas "
+                      f"({reducidas} reducidas, {reducidas*100//max(sin_sim,1)}%)")
         else:
-            # Estrategia 3: heurística
+            # Estrategia 3: heurística (N > 15)
             costos_var = sorted([(filas[v].sum(), v) for v in range(n)])
             vars_ord = [v for _, v in costos_var]
             for _, var in costos_var:
                 p1 = [var]
                 p2 = [i for i in indices if i != var]
-                clave = (tuple(p1), tuple(p2))
-                if clave not in vistas:
-                    vistas.add(clave)
-                    candidatas.append((p1, p1, p2, p2))
+                agregar(p1, p2)
             for tam in range(1, n // 2 + 1):
                 p1 = sorted(vars_ord[:tam])
                 p2 = sorted(vars_ord[tam:])
-                clave = (tuple(p1), tuple(p2))
-                if clave not in vistas:
-                    vistas.add(clave)
-                    candidatas.append((p1, p1, p2, p2))
+                agregar(p1, p2)
 
         return candidatas
+
+    # ==================================================================
+    # API PÚBLICA REQUERIDA POR §5.1.2
+    # ==================================================================
+
+    def calcular_transicion_coste(self, i: int, j: int, var_idx: int) -> float:
+        """
+        Calcula t(i,j) para la variable var_idx.
+
+        Si la tabla aún no fue computada, la calcula automáticamente.
+        En modo sparse (N>8) solo está disponible desde el estado inicial;
+        en modo denso (N<=8) cualquier par (i,j) es válido.
+
+        Args:
+            i       : índice del estado de origen (entero en [0, 2^n))
+            j       : índice del estado de destino (entero en [0, 2^n))
+            var_idx : índice de la variable (0-based)
+
+        Returns:
+            Costo de transición t(i,j) para la variable var_idx.
+        """
+        if not self.tabla_costos:
+            if not self.tensores:
+                self.tensores = self.sistema.obtener_tensores()
+            self.tabla_costos = self._calcular_tabla_costos_paralelo()
+
+        T = self.tabla_costos[var_idx]
+        if isinstance(T, dict):
+            idx_inicio = int(self.sistema.estado_inicial[::-1], 2)
+            if i != idx_inicio:
+                raise ValueError(
+                    f"Tabla sparse: solo disponible desde el estado inicial "
+                    f"(idx={idx_inicio}). Recibido i={i}."
+                )
+            return float(T['fila_inicio'][j])
+        return float(T[i, j])
+
+    def identificar_candidatos(self) -> list:
+        """
+        Identifica biparticiones candidatas a partir de la tabla T.
+
+        Si la tabla aún no fue computada, la calcula automáticamente.
+        Cada candidata tiene la forma (p1_futuro, p1_pasado, p2_futuro, p2_pasado).
+
+        Returns:
+            Lista de tuplas (p1f, p1p, p2f, p2p) con biparticiones candidatas.
+        """
+        if not self.tabla_costos:
+            if not self.tensores:
+                self.tensores = self.sistema.obtener_tensores()
+            self.tabla_costos = self._calcular_tabla_costos_paralelo()
+        return self._identificar_candidatas()
 
     # ==================================================================
     # DISTRIBUCIÓN PARTICIONADA
@@ -273,7 +415,10 @@ class KGeoMIP(SIA):
         def dist_parte(futuro: list, presente: list) -> NDArray:
             if not futuro or not presente:
                 return np.array([1.0])
-            cols = sorted(j for j in range(n) if j in futuro)
+            # Mapeo variable j → columna n-1-j (compensa la inversión de
+            # columnas que hace desde_csv al cargar la TPM del documento).
+            # Equivalente a var_a_col = {i: (n-1-i)} de KQNodes.
+            cols = sorted(n - 1 - j for j in futuro)
             tpm_cols = tpm[:, cols]
             pres = sorted(presente)
             n_p = len(pres)
@@ -295,7 +440,17 @@ class KGeoMIP(SIA):
                 dist = np.kron(dist, np.array([1.0 - p, p]))
             return dist
 
-        return np.kron(dist_parte(p1f, p1p), dist_parte(p2f, p2p))
+        dist_part = np.kron(dist_parte(p1f, p1p), dist_parte(p2f, p2p))
+
+        # Reordenar ejes para que el encoding coincida con distribucion_estado_inicial()
+        col_order = (sorted(n - 1 - j for j in p1f) +
+                     sorted(n - 1 - j for j in p2f))
+        target = list(range(n))
+        if col_order != target:
+            axes = [col_order.index(j) for j in target]
+            dist_part = dist_part.reshape([2] * n).transpose(axes).reshape(-1)
+
+        return dist_part
 
 
 # Alias de compatibilidad
@@ -401,13 +556,20 @@ class KGeoMIPKPartition(SIA):
         var_a_col = {i: (n - 1 - i) for i in range(n)}
 
         dist_total = np.array([1.0])
+        col_order: list[int] = []
         for parte in particion:
             futuro_cols = sorted(var_a_col[v] for v in parte)
             presente_bits = sorted(parte)
             dist_parte = _dist_parte_vectorizada(
                 tpm, futuro_cols, presente_bits, n, idx_inicio
             )
+            col_order.extend(futuro_cols)
             dist_total = np.kron(dist_total, dist_parte)
+
+        target = list(range(n))
+        if col_order != target:
+            axes = [col_order.index(j) for j in target]
+            dist_total = dist_total.reshape([2] * n).transpose(axes).reshape(-1)
         return dist_total
 
     def _branch_and_bound_k(self, k: int, variables: list, tabla_T, dist_orig) -> dict:

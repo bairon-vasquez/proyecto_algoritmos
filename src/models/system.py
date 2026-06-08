@@ -52,6 +52,40 @@ class System:
         return cls(tpm, estado_inicial, etiquetas)
 
     @classmethod
+    def sintetico(
+        cls,
+        n: int,
+        estado_inicial: str | None = None,
+        seed: int | None = None,
+    ) -> "System":
+        """
+        Genera un sistema N-variable con TPM sintética determinista.
+
+        Alternativa a desde_csv() cuando no existe archivo (N=20,22,25).
+        La semilla predeterminada es el propio N, lo que garantiza que
+        "System.sintetico(20)" siempre produce el mismo sistema.
+
+        Límite de memoria:
+            n<=15: TPM completa (2^n, n)  — máx. 3.8 MB
+            n<=20: TPM completa (2^n, n)  — máx. ~160 MB (float64)
+            n>20 : TPM truncada a 2^20 filas con advertencia
+        """
+        if estado_inicial is None:
+            estado_inicial = '0' * n
+        if seed is None:
+            seed = n  # semilla canónica: el tamaño del sistema
+
+        num_filas = 2 ** n
+        if n > 20:
+            num_filas = 2 ** 20
+            print(f"  [SINT] N={n}>20: TPM reducida a 2^20 filas (memoria)")
+
+        rng = np.random.default_rng(seed)
+        tpm = rng.random((num_filas, n)).astype(np.float64)
+        etiquetas = [chr(ord('A') + i) for i in range(n)]
+        return cls(tpm, estado_inicial, etiquetas)
+
+    @classmethod
     def desde_csv(cls, filepath: str, estado_inicial: str) -> "System":
         """
         Carga la TPM desde CSV aplicando corrección de orden de columnas.

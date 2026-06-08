@@ -32,7 +32,7 @@ def test_tabla_costos_variable_A():
     sys = System(TPM_DOC, "000")
     geo = GeometricSIA(sys)
     geo.tensores = sys.obtener_tensores()
-    geo.tabla_costos = geo._calcular_tabla_costos()
+    geo.tabla_costos = geo._calcular_tabla_costos_paralelo()
 
     T_A = geo.tabla_costos[0]  # variable A
     idx = 0  # estado 000
@@ -54,7 +54,7 @@ def test_tabla_costos_variable_B():
     sys = System(TPM_DOC, "000")
     geo = GeometricSIA(sys)
     geo.tensores = sys.obtener_tensores()
-    geo.tabla_costos = geo._calcular_tabla_costos()
+    geo.tabla_costos = geo._calcular_tabla_costos_paralelo()
 
     T_B = geo.tabla_costos[1]
     idx = 0
@@ -74,7 +74,7 @@ def test_tabla_costos_variable_C():
     sys = System(TPM_DOC, "000")
     geo = GeometricSIA(sys)
     geo.tensores = sys.obtener_tensores()
-    geo.tabla_costos = geo._calcular_tabla_costos()
+    geo.tabla_costos = geo._calcular_tabla_costos_paralelo()
 
     T_C = geo.tabla_costos[2]
     idx = 0

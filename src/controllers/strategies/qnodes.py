@@ -255,30 +255,35 @@ class KQNodes(SIA):
         idx_inicio: int
     ) -> NDArray[np.float64]:
         """
-        Calcula dist_total = kron(dist_P1, ..., dist_Pk) usando caché.
+        Calcula dist_total = kron(dist_P1, ..., dist_Pk) usando caché,
+        con reordenamiento de ejes para que el encoding de dist_total
+        coincida con el de distribucion_estado_inicial() (columnas 0..n-1).
 
-        Para cada parte Pi, la distribución marginal se obtiene del caché
-        si ya fue calculada antes. Esto elimina el recálculo de subconjuntos
-        que aparecen en múltiples particiones.
-
-        Ejemplo: la parte {A,B} aparece en particiones como
-        {A,B}|{C}|{D,E} y {A,B}|{C,D}|{E} -> calculada UNA VEZ.
+        Sin este reordenamiento, dist_total tendría las variables en el
+        orden de la partición, no en el orden de índice de columna, lo
+        que produce un EMD incorrecto frente a dist_orig.
         """
         dist_total = np.array([1.0])
+        col_order: list[int] = []
 
         for parte in particion:
             clave = frozenset(parte)
 
             if clave not in self._cache_dist:
-                # Primera vez que aparece este subconjunto: calcular y guardar
                 futuro_cols  = sorted(self.var_a_col[v] for v in parte)
                 presente_bits = sorted(parte)
                 self._cache_dist[clave] = _dist_parte_vectorizada(
                     tpm, futuro_cols, presente_bits, n, idx_inicio
                 )
 
-            # Combinar con producto de Kronecker (Teorema 1.2.1)
+            col_order.extend(sorted(self.var_a_col[v] for v in parte))
             dist_total = np.kron(dist_total, self._cache_dist[clave])
+
+        # Reordenar ejes: col_order[k] → eje k; queremos ejes en orden 0..n-1
+        target = list(range(n))
+        if col_order != target:
+            axes = [col_order.index(j) for j in target]
+            dist_total = dist_total.reshape([2] * n).transpose(axes).reshape(-1)
 
         return dist_total
 

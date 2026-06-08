@@ -146,34 +146,34 @@ def ejecutar_prueba(
     registro_qnod: RegistroMetricas,
     timeout_qnodes: int | None = None,
     salida_path: str | None = None,
-    num_prueba: int = 0
+    num_prueba: int = 0,
+    sistema_completo=None,
 ) -> None:
     """
     Ejecuta una prueba individual con alcance y mecanismo específicos.
 
-    n             : número de variables del sistema completo
-    estado_inicial: cadena binaria ej. '1000000000'
-    alcance_str   : variables en t+1 ej. 'ABCDEFGHIJ'
-    mecanismo_str : variables en t   ej. 'ABCDEFGHI'
-    csv_path      : ruta al CSV del sistema completo
+    n              : número de variables del sistema completo
+    estado_inicial : cadena binaria ej. '1000000000'
+    alcance_str    : variables en t+1 ej. 'ABCDEFGHIJ'
+    mecanismo_str  : variables en t   ej. 'ABCDEFGHI'
+    csv_path       : ruta al CSV del sistema completo (puede no existir)
+    sistema_completo: System pre-cargado (evita releer CSV por cada prueba)
     """
-    # Cargar sistema o crear sintético cuando el CSV no existe (N grandes)
-    if os.path.exists(csv_path):
-        sistema_completo = System.desde_csv(csv_path, estado_inicial)
+    if sistema_completo is not None:
         subsistema = sistema_completo.construir_subsistema(
             list(alcance_str), list(mecanismo_str)
         )
+    elif os.path.exists(csv_path):
+        sc = System.desde_csv(csv_path, estado_inicial)
+        subsistema = sc.construir_subsistema(
+            list(alcance_str), list(mecanismo_str)
+        )
     else:
-        # Subsistema sintético directo para N grandes sin CSV (ej. N=25)
-        # Usa topología aleatoria reproducible basada en las variables
-        n_sub  = min(len(alcance_str), len(mecanismo_str))
-        n_rows = 2 ** min(n_sub, 20)  # max 2^20 filas en memoria
-        seed   = sum(ord(c) for c in estado_inicial + alcance_str + mecanismo_str) % (2**31)
-        rng    = np.random.default_rng(seed)
-        tpm_rand = rng.random((n_rows, n_sub))
+        # Fallback: subsistema sintético cuando el sistema completo no fue
+        # pre-cargado y el CSV no existe (path de compatibilidad)
+        n_sub    = min(len(alcance_str), len(mecanismo_str))
         est_sub  = (estado_inicial + '0' * n_sub)[:n_sub]
-        etqs_sub = list(alcance_str[:n_sub])
-        subsistema = System(tpm_rand, est_sub, etqs_sub)
+        subsistema = System.sintetico(n_sub, est_sub, seed=n)
         print(f"  [SINT] {csv_path} no existe → subsistema sintético n={n_sub}")
 
     print(f"\n  Subsistema: alcance={alcance_str} mecanismo={mecanismo_str}")
@@ -546,14 +546,26 @@ def ejecutar_suite_pruebas(
     """
     Ejecuta todas las pruebas del Excel para un tamaño N dado.
     Guarda resultados en results/resultados_suite_N{n}.csv
+
+    Para N>=20 donde no existe CSV: crea automáticamente un sistema
+    sintético determinista con System.sintetico(n, seed=n) y lo reutiliza
+    en todas las pruebas de la suite (una sola generación de TPM).
     """
     csv_path = os.path.join(carpeta, f"N{n}C.csv")
-    if not os.path.exists(csv_path):
-        print(f"  AVISO: {csv_path} no encontrado.")
-        return
 
     os.makedirs("results", exist_ok=True)
     salida_path = os.path.join("results", f"resultados_suite_N{n}.csv")
+
+    # Cargar o generar el sistema base UNA sola vez (evita re-generar por prueba)
+    if os.path.exists(csv_path):
+        print(f"  Cargando {csv_path}...")
+        sistema_base = System.desde_csv(csv_path, estado_inicial)
+        print(f"  Sistema cargado: {sistema_base}")
+    else:
+        print(f"  [SINT] {csv_path} no encontrado — generando sistema sintético "
+              f"N={n} (seed={n})")
+        sistema_base = System.sintetico(n, estado_inicial, seed=n)
+        print(f"  Sistema sintético: {sistema_base}")
 
     # Encabezado del CSV de resultados
     with open(salida_path, 'w', encoding='utf-8') as f:
@@ -567,7 +579,7 @@ def ejecutar_suite_pruebas(
     print(f"\n{'='*60}")
     print(f"  Suite N={n} — {total} pruebas")
     print(f"  Estado inicial: {estado_inicial}")
-    print(f"  CSV: {csv_path}")
+    print(f"  Modo: {'CSV real' if os.path.exists(csv_path) else 'sintético (seed=' + str(n) + ')'}")
     print(f"{'='*60}")
 
     for num, (alcance_str, mecanismo_str) in enumerate(pruebas, start=1):
@@ -589,7 +601,8 @@ def ejecutar_suite_pruebas(
                 registro_qnod=reg_qnod,
                 timeout_qnodes=600 if usar_timeout else None,
                 salida_path=salida_path,
-                num_prueba=num
+                num_prueba=num,
+                sistema_completo=sistema_base,
             )
 
             # Guardar en CSV de suite inmediatamente (no perder datos si se cuelga)

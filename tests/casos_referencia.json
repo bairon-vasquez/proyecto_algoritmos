@@ -1,0 +1,585 @@
+{
+  "descripcion": "Casos de referencia generados con KQNodes k=2 exhaustivo",
+  "metodo_ref": "KQNodes_k2_exacto (S(n,2) biparticiones evaluadas)",
+  "total": 26,
+  "casos": [
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "ABC",
+      "mecanismo": "ABC",
+      "n_sub": 3,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1,
+            2
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 3.6096,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "ABC",
+      "mecanismo": "AB",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.5,
+        "phi_norm": 0.25,
+        "tiempo_s": 0.0015,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "ABC",
+      "mecanismo": "BC",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.5,
+        "phi_norm": 0.25,
+        "tiempo_s": 0.001,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "ABC",
+      "mecanismo": "AC",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.001,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "AB",
+      "mecanismo": "ABC",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.5,
+        "phi_norm": 0.25,
+        "tiempo_s": 0.0,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "BC",
+      "mecanismo": "ABC",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.0,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "AC",
+      "mecanismo": "ABC",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.001,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "AB",
+      "mecanismo": "AB",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.5,
+        "phi_norm": 0.25,
+        "tiempo_s": 0.0,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N3C.csv",
+      "estado": "000",
+      "alcance": "BC",
+      "mecanismo": "BC",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.5,
+        "phi_norm": 0.25,
+        "tiempo_s": 0.0,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ABCDE",
+      "mecanismo": "ABCDE",
+      "n_sub": 5,
+      "referencia": {
+        "biparticion": [
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ],
+        "phi_raw": 0.25,
+        "phi_norm": 0.05,
+        "tiempo_s": 0.023,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ABCDE",
+      "mecanismo": "ABCD",
+      "n_sub": 4,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1,
+            2,
+            3
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.002,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ABCDE",
+      "mecanismo": "BCDE",
+      "n_sub": 4,
+      "referencia": {
+        "biparticion": [
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            3
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.0085,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ABCDE",
+      "mecanismo": "ACE",
+      "n_sub": 3,
+      "referencia": {
+        "biparticion": [
+          [
+            0,
+            1
+          ],
+          [
+            2
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.002,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ABCD",
+      "mecanismo": "ABCDE",
+      "n_sub": 4,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1,
+            2,
+            3
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.002,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "BCDE",
+      "mecanismo": "ABCDE",
+      "n_sub": 4,
+      "referencia": {
+        "biparticion": [
+          [
+            0,
+            1
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "phi_raw": 0.25,
+        "phi_norm": 0.0625,
+        "tiempo_s": 0.005,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ACE",
+      "mecanismo": "ABCDE",
+      "n_sub": 3,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1,
+            2
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.002,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ABCD",
+      "mecanismo": "ABCD",
+      "n_sub": 4,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1,
+            2,
+            3
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.001,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ABC",
+      "mecanismo": "ABCDE",
+      "n_sub": 3,
+      "referencia": {
+        "biparticion": [
+          [
+            0,
+            1
+          ],
+          [
+            2
+          ]
+        ],
+        "phi_raw": 0.25,
+        "phi_norm": 0.08333333,
+        "tiempo_s": 0.002,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N5C.csv",
+      "estado": "00000",
+      "alcance": "ABCDE",
+      "mecanismo": "ABC",
+      "n_sub": 3,
+      "referencia": {
+        "biparticion": [
+          [
+            0,
+            1
+          ],
+          [
+            2
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.0031,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N10C.csv",
+      "estado": "1000000000",
+      "alcance": "ACEGI",
+      "mecanismo": "ACEGI",
+      "n_sub": 5,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1,
+            2,
+            3,
+            4
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.006,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N10C.csv",
+      "estado": "1000000000",
+      "alcance": "BDFHJ",
+      "mecanismo": "BDFHJ",
+      "n_sub": 5,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1,
+            2,
+            3,
+            4
+          ]
+        ],
+        "phi_raw": 1.0,
+        "phi_norm": 0.2,
+        "tiempo_s": 0.033,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N10C.csv",
+      "estado": "1000000000",
+      "alcance": "ABCDE",
+      "mecanismo": "ABCDE",
+      "n_sub": 5,
+      "referencia": {
+        "biparticion": [
+          [
+            2
+          ],
+          [
+            0,
+            1,
+            3,
+            4
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.0145,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N10C.csv",
+      "estado": "1000000000",
+      "alcance": "FGHIJ",
+      "mecanismo": "FGHIJ",
+      "n_sub": 5,
+      "referencia": {
+        "biparticion": [
+          [
+            2
+          ],
+          [
+            0,
+            1,
+            3,
+            4
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.0275,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N10C.csv",
+      "estado": "1000000000",
+      "alcance": "ACE",
+      "mecanismo": "ACEGI",
+      "n_sub": 3,
+      "referencia": {
+        "biparticion": [
+          [
+            1
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.002,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N10C.csv",
+      "estado": "1000000000",
+      "alcance": "ABCDE",
+      "mecanismo": "BDFHJ",
+      "n_sub": 2,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.0015,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    },
+    {
+      "csv": "data/N10C.csv",
+      "estado": "1000000000",
+      "alcance": "ACEGI",
+      "mecanismo": "ABCDE",
+      "n_sub": 3,
+      "referencia": {
+        "biparticion": [
+          [
+            0
+          ],
+          [
+            1,
+            2
+          ]
+        ],
+        "phi_raw": 0.0,
+        "phi_norm": 0.0,
+        "tiempo_s": 0.001,
+        "metodo": "KQNodes_k2_exhaustivo"
+      }
+    }
+  ]
+}

@@ -26,28 +26,28 @@ except Exception as exc:
     MODULES_OK = False
     MODULES_ERROR = str(exc)
 
-# ── Paleta de colores científica (estilo dark scientific) ─────────────────────
+# ── Paleta de colores (estilo VS Code Dark Purple) ────────────────────────────
 COLORS = {
-    'bg_main':       '#0d1117',
-    'bg_panel':      '#161b22',
-    'bg_input':      '#21262d',
-    'bg_hover':      '#30363d',
-    'accent':        '#238636',
-    'accent_light':  '#2ea043',
-    'danger':        '#da3633',
-    'warning':       '#d29922',
-    'info':          '#388bfd',
-    'text_primary':  '#c9d1d9',
-    'text_secondary':'#8b949e',
-    'text_accent':   '#58a6ff',
-    'border':        '#30363d',
-    'success':       '#3fb950',
-    'log_cmd':       '#58a6ff',
-    'log_result':    '#3fb950',
-    'log_warning':   '#d29922',
-    'log_error':     '#f85149',
-    'phi_zero':      '#3fb950',
-    'phi_nonzero':   '#d29922',
+    'bg_main':       '#1e1e2e',
+    'bg_panel':      '#252537',
+    'bg_input':      '#313244',
+    'bg_hover':      '#45475a',
+    'accent':        '#4f46e5',
+    'accent_light':  '#6366f1',
+    'danger':        '#f38ba8',
+    'warning':       '#fab387',
+    'info':          '#89b4fa',
+    'text_primary':  '#cdd6f4',
+    'text_secondary':'#a6adc8',
+    'text_accent':   '#cba6f7',
+    'border':        '#45475a',
+    'success':       '#a6e3a1',
+    'log_cmd':       '#89b4fa',
+    'log_result':    '#a6e3a1',
+    'log_warning':   '#fab387',
+    'log_error':     '#f38ba8',
+    'phi_zero':      '#a6e3a1',
+    'phi_nonzero':   '#fab387',
 }
 
 # ── Configuraciones predefinidas del Excel ──────────────────────────────────
@@ -213,9 +213,9 @@ class App(tk.Tk):
         left = tk.LabelFrame(
             root,
             text="Configuración del Sistema",
-            font=('Segoe UI', 10, 'bold'),
-            bg=C['bg_panel'], fg=C['text_primary'],
-            bd=1, padx=12, pady=8,
+            font=('Segoe UI', 11, 'bold'),
+            bg=C['bg_panel'], fg=C['text_accent'],
+            bd=1, padx=10, pady=8,
         )
         left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         left.pack_propagate(False)
@@ -224,8 +224,8 @@ class App(tk.Tk):
         right = tk.LabelFrame(
             root,
             text="Resultados",
-            font=('Segoe UI', 10, 'bold'),
-            bg=C['bg_panel'], fg=C['text_primary'],
+            font=('Segoe UI', 11, 'bold'),
+            bg=C['bg_panel'], fg=C['text_accent'],
             bd=1, padx=10, pady=8,
         )
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -236,29 +236,42 @@ class App(tk.Tk):
 
     def _build_left(self, p):
         C = COLORS
+
+        def section_sep(text, row_):
+            frm = tk.Frame(p, bg=C['bg_panel'])
+            frm.grid(row=row_, column=0, columnspan=2, sticky="ew",
+                     pady=(9, 3))
+            frm.columnconfigure(1, weight=1)
+            tk.Label(
+                frm, text=text.upper(),
+                font=('Segoe UI', 8, 'bold'),
+                fg=C['text_accent'], bg=C['bg_panel'],
+            ).grid(row=0, column=0, padx=(0, 8))
+            tk.Frame(frm, height=1, bg=C['border']).grid(
+                row=0, column=1, sticky="ew")
+            return row_ + 1
+
+        def field(label_text, attr, row_):
+            tk.Label(
+                p, text=label_text, anchor="e",
+                font=('Segoe UI', 9), width=14,
+                fg=C['text_secondary'], bg=C['bg_panel'],
+            ).grid(row=row_, column=0, sticky="e", padx=(0, 6), pady=3)
+            var = tk.StringVar()
+            tk.Entry(
+                p, textvariable=var,
+                bg=C['bg_input'], fg=C['text_primary'],
+                insertbackground=C['text_primary'],
+                relief=tk.FLAT, font=('Segoe UI', 9),
+                highlightbackground=C['border'], highlightthickness=1,
+            ).grid(row=row_, column=1, sticky="ew", pady=3)
+            setattr(self, attr, var)
+            return row_ + 1
+
         row = 0
 
-        tk.Label(
-            p,
-            text="KQNodes / KGeoMIP  v1.0\n"
-                 "Análisis de k-Particiones Óptimas\n"
-                 "Análisis y Diseño de Algoritmos 2026-1",
-            font=('Segoe UI', 9),
-            fg=C['text_secondary'], bg=C['bg_panel'],
-            justify=tk.CENTER,
-        ).grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 8))
-        row += 1
-
-        tk.Frame(p, height=1, bg=C['border']).grid(
-            row=row, column=0, columnspan=2, sticky="ew", pady=(0, 8))
-        row += 1
-
-        tk.Label(
-            p, text="Sistema predefinido:", anchor="w",
-            font=('Segoe UI', 9, 'bold'),
-            fg=C['text_primary'], bg=C['bg_panel'],
-        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(0, 2))
-        row += 1
+        # ── Sistema predefinido ───────────────────────────────────────────
+        row = section_sep("Sistema predefinido", row)
 
         self._n_var = tk.StringVar(value="— seleccionar —")
         opts = ["— seleccionar —"] + list(PREDEFINIDOS) + ["Personalizado"]
@@ -276,52 +289,36 @@ class App(tk.Tk):
             activebackground=C['bg_hover'], activeforeground=C['text_primary'],
             font=('Segoe UI', 9),
         )
-        om.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        om.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(2, 4))
         row += 1
 
-        def field(label_text, attr, row_):
-            tk.Label(
-                p, text=label_text, anchor="w",
-                font=('Segoe UI', 9),
-                fg=C['text_secondary'], bg=C['bg_panel'],
-            ).grid(row=row_, column=0, columnspan=2, sticky="w", pady=(4, 1))
-            row_ += 1
-            var = tk.StringVar()
-            tk.Entry(
-                p, textvariable=var, width=34,
-                bg=C['bg_input'], fg=C['text_primary'],
-                insertbackground=C['text_primary'],
-                relief=tk.FLAT, font=('Segoe UI', 9),
-                highlightbackground=C['border'], highlightthickness=1,
-            ).grid(row=row_, column=0, columnspan=2, sticky="ew")
-            setattr(self, attr, var)
-            return row_ + 1
+        # ── Sistema completo ──────────────────────────────────────────────
+        row = section_sep("Sistema", row)
+        row = field("Variables:",  "_sys_var", row)
+        row = field("Estado:",     "_est_var", row)
 
-        row = field("Sistema completo (variables):", "_sys_var", row)
-        row = field("Estado inicial (binario):",     "_est_var", row)
-
+        # CSV (label + entry + browse en la misma fila)
         tk.Label(
-            p, text="Ruta CSV:", anchor="w",
-            font=('Segoe UI', 9),
+            p, text="CSV:", anchor="e",
+            font=('Segoe UI', 9), width=14,
             fg=C['text_secondary'], bg=C['bg_panel'],
-        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(4, 1))
-        row += 1
+        ).grid(row=row, column=0, sticky="e", padx=(0, 6), pady=3)
 
         self._csv_var = tk.StringVar()
         cf = tk.Frame(p, bg=C['bg_panel'])
-        cf.grid(row=row, column=0, columnspan=2, sticky="ew")
+        cf.grid(row=row, column=1, sticky="ew", pady=3)
         tk.Entry(
-            cf, textvariable=self._csv_var, width=24,
+            cf, textvariable=self._csv_var,
             bg=C['bg_input'], fg=C['text_primary'],
             insertbackground=C['text_primary'],
             relief=tk.FLAT, font=('Segoe UI', 9),
             highlightbackground=C['border'], highlightthickness=1,
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
         tk.Button(
-            cf, text="Buscar…", command=self._browse,
+            cf, text="…", command=self._browse,
             bg=C['bg_hover'], fg=C['text_primary'],
             activebackground=C['border'], activeforeground=C['text_primary'],
-            relief=tk.FLAT, font=('Segoe UI', 8), padx=6, pady=3,
+            relief=tk.FLAT, font=('Segoe UI', 10), padx=6, pady=2,
         ).pack(side=tk.RIGHT, padx=(4, 0))
         row += 1
 
@@ -331,28 +328,22 @@ class App(tk.Tk):
             fg=C['text_secondary'], bg=C['bg_panel'],
         )
         self._csv_status_lbl.grid(
-            row=row, column=0, columnspan=2, sticky="w", pady=(1, 4))
+            row=row, column=0, columnspan=2, sticky="w", pady=(0, 2))
         row += 1
 
-        row = field("Alcance (t+1):",  "_alc_var", row)
-        row = field("Mecanismo (t):",  "_mec_var", row)
+        # ── Subsistema ────────────────────────────────────────────────────
+        row = section_sep("Subsistema", row)
+        row = field("Alcance (t+1):", "_alc_var", row)
+        row = field("Mecanismo (t):", "_mec_var", row)
 
-        tk.Frame(p, height=1, bg=C['border']).grid(
-            row=row, column=0, columnspan=2, sticky="ew", pady=10)
-        row += 1
-
-        tk.Label(
-            p, text="Estrategias:", anchor="w",
-            font=('Segoe UI', 9, 'bold'),
-            fg=C['text_primary'], bg=C['bg_panel'],
-        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(0, 4))
-        row += 1
+        # ── Estrategias ───────────────────────────────────────────────────
+        row = section_sep("Estrategias", row)
 
         self._use_geo  = tk.BooleanVar(value=True)
         self._use_qnod = tk.BooleanVar(value=True)
 
         for text, var in [
-            ("KGeoMIP (k=2)    — bipartición óptima",   self._use_geo),
+            ("KGeoMIP  (k=2)  — bipartición óptima",    self._use_geo),
             ("KQNodes (k=3,4,5) — k-partición óptima",  self._use_qnod),
         ]:
             tk.Checkbutton(
@@ -364,8 +355,8 @@ class App(tk.Tk):
             ).grid(row=row, column=0, columnspan=2, sticky="w", pady=2)
             row += 1
 
-        tk.Label(p, text="", bg=C['bg_panel']).grid(row=row)
-        row += 1
+        # ── Ejecución ─────────────────────────────────────────────────────
+        row = section_sep("Ejecución", row)
 
         self._btn_run = tk.Button(
             p, text="▶  Ejecutar análisis",
@@ -376,14 +367,14 @@ class App(tk.Tk):
             padx=8, pady=9, cursor="hand2",
         )
         self._btn_run.grid(
-            row=row, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+            row=row, column=0, columnspan=2, sticky="ew", pady=(2, 5))
         row += 1
 
         self._btn_suite = tk.Button(
             p, text="⚡ Ejecutar suite",
             font=('Segoe UI', 10, 'bold'),
-            bg='#1f6feb', fg="white",
-            activebackground='#388bfd', activeforeground="white",
+            bg='#7c3aed', fg="white",
+            activebackground='#8b5cf6', activeforeground="white",
             relief=tk.FLAT, command=self._ejecutar_suite,
             padx=8, pady=7, cursor="hand2",
         )
@@ -399,7 +390,7 @@ class App(tk.Tk):
             padx=8, pady=5,
         ).grid(row=row, column=0, columnspan=2, sticky="ew")
 
-        p.columnconfigure(0, weight=1)
+        p.columnconfigure(1, weight=1)
 
         # ── Trazas ────────────────────────────────────────────────────────
         def _on_campo_modificado(*args):
@@ -471,8 +462,8 @@ class App(tk.Tk):
         # ── Log ───────────────────────────────────────────────────────────
         log_frm = tk.LabelFrame(
             p, text="Progreso en tiempo real",
-            font=('Segoe UI', 10, 'bold'),
-            bg=C['bg_panel'], fg=C['text_primary'],
+            font=('Segoe UI', 11, 'bold'),
+            bg=C['bg_panel'], fg=C['text_accent'],
             bd=1, padx=6, pady=6,
         )
         log_frm.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
@@ -499,8 +490,8 @@ class App(tk.Tk):
         # ── Tabla de resultados ────────────────────────────────────────────
         tbl_frm = tk.LabelFrame(
             p, text="Tabla de resultados",
-            font=('Segoe UI', 10, 'bold'),
-            bg=C['bg_panel'], fg=C['text_primary'],
+            font=('Segoe UI', 11, 'bold'),
+            bg=C['bg_panel'], fg=C['text_accent'],
             bd=1, padx=6, pady=6,
         )
         tbl_frm.pack(fill=tk.X, pady=(0, 8))
@@ -526,7 +517,7 @@ class App(tk.Tk):
         self._tree.pack(fill=tk.X)
 
         self._tree.tag_configure("phi_zero",
-                                 background='#1a3a1a',
+                                 background='#1e2d20',
                                  foreground=C['phi_zero'])
         self._tree.tag_configure("phi_nonzero",
                                  foreground=C['phi_nonzero'])
@@ -536,8 +527,8 @@ class App(tk.Tk):
         # ── Análisis Automático — Notebook con 5 pestañas ─────────────────
         anal_frm = tk.LabelFrame(
             p, text="Análisis Automático",
-            font=('Segoe UI', 10, 'bold'),
-            bg=C['bg_panel'], fg=C['text_primary'],
+            font=('Segoe UI', 11, 'bold'),
+            bg=C['bg_panel'], fg=C['text_accent'],
             bd=1, padx=4, pady=4,
         )
         anal_frm.pack(fill=tk.BOTH, expand=True)
@@ -588,8 +579,8 @@ class App(tk.Tk):
         tk.Button(
             btn_bar, text="📥 Exportar todo el historial",
             command=self._exportar_historial_excel,
-            bg='#1f6feb', fg="white",
-            activebackground='#388bfd', activeforeground="white",
+            bg='#4f46e5', fg="white",
+            activebackground='#6366f1', activeforeground="white",
             relief=tk.FLAT, font=('Segoe UI', 9),
             padx=8, pady=5, cursor="hand2",
         ).pack(side=tk.LEFT, padx=4, pady=4)
@@ -606,8 +597,8 @@ class App(tk.Tk):
         tk.Button(
             btn_bar, text="📊 Completar plataformas",
             command=self._completar_plataformas,
-            bg='#6e40c9', fg="white",
-            activebackground='#8957e5', activeforeground="white",
+            bg='#7c3aed', fg="white",
+            activebackground='#8b5cf6', activeforeground="white",
             relief=tk.FLAT, font=('Segoe UI', 9),
             padx=8, pady=5, cursor="hand2",
         ).pack(side=tk.LEFT, padx=4, pady=4)
