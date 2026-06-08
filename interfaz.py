@@ -26,6 +26,12 @@ except Exception as exc:
     MODULES_OK = False
     MODULES_ERROR = str(exc)
 
+try:
+    import sv_ttk
+    _SV_TTK = True
+except ImportError:
+    _SV_TTK = False
+
 # ── Paleta de colores (estilo VS Code Dark Purple) ────────────────────────────
 COLORS = {
     'bg_main':       '#1e1e2e',
@@ -193,6 +199,9 @@ class App(tk.Tk):
         self._historial_analisis: list = []
 
         self._build_ui()
+
+        if _SV_TTK:
+            sv_ttk.set_theme("dark")
 
         if not MODULES_OK:
             messagebox.showwarning(
@@ -422,42 +431,16 @@ class App(tk.Tk):
     def _build_right(self, p):
         C = COLORS
 
-        # ── Estilos ttk ───────────────────────────────────────────────────
+        # ── Estilos ttk (sv-ttk aplica su propio tema dark encima) ───────────
         style = ttk.Style()
-        style.theme_use('default')
         style.configure("Dark.Treeview",
-                        background=C['bg_input'],
-                        foreground=C['text_primary'],
-                        fieldbackground=C['bg_input'],
                         rowheight=22,
                         font=('Consolas', 9))
         style.configure("Dark.Treeview.Heading",
-                        background=C['bg_hover'],
-                        foreground=C['text_accent'],
-                        font=('Segoe UI', 9, 'bold'),
-                        relief='flat')
-        style.map("Dark.Treeview",
-                  background=[('selected', C['bg_hover'])],
-                  foreground=[('selected', C['text_primary'])])
-        style.configure("TProgressbar",
-                        background=C['accent'],
-                        troughcolor=C['bg_input'],
-                        bordercolor=C['border'],
-                        lightcolor=C['accent'],
-                        darkcolor=C['accent'])
-        style.configure("Dark.TNotebook",
-                        background=C['bg_panel'],
-                        tabmargins=[2, 4, 2, 0])
+                        font=('Segoe UI', 9, 'bold'))
         style.configure("Dark.TNotebook.Tab",
-                        background=C['bg_input'],
-                        foreground=C['text_secondary'],
                         padding=[10, 4],
                         font=('Segoe UI', 9, 'bold'))
-        style.map("Dark.TNotebook.Tab",
-                  background=[('selected', C['bg_hover']),
-                               ('active',   C['bg_hover'])],
-                  foreground=[('selected', C['text_accent']),
-                               ('active',   C['text_primary'])])
 
         # ── Log ───────────────────────────────────────────────────────────
         log_frm = tk.LabelFrame(
