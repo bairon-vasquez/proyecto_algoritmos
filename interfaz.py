@@ -1,5 +1,5 @@
 """
-Interfaz gráfica para KQNodes / KGeoMIP
+Interfaz gráfica GeoMIP — KQNodes / KGeoMIP
 Análisis de k-Particiones Óptimas — ADA 2026-1
 """
 import tkinter as tk
@@ -22,9 +22,17 @@ try:
     from src.controllers.strategies.qnodes import KQNodes
     MODULES_OK = True
     MODULES_ERROR = None
-except Exception as exc:
+except Exception as _exc:
     MODULES_OK = False
-    MODULES_ERROR = str(exc)
+    MODULES_ERROR = str(_exc)
+
+try:
+    import customtkinter as ctk
+    ctk.set_appearance_mode("dark")
+    ctk.set_default_color_theme("blue")
+    _CTK = True
+except ImportError:
+    _CTK = False
 
 try:
     import sv_ttk
@@ -32,613 +40,588 @@ try:
 except ImportError:
     _SV_TTK = False
 
-# ── Paleta de colores (estilo VS Code Dark Purple) ────────────────────────────
-COLORS = {
-    'bg_main':       '#1e1e2e',
-    'bg_panel':      '#252537',
-    'bg_input':      '#313244',
-    'bg_hover':      '#45475a',
-    'accent':        '#4f46e5',
-    'accent_light':  '#6366f1',
-    'danger':        '#f38ba8',
-    'warning':       '#fab387',
-    'info':          '#89b4fa',
-    'text_primary':  '#cdd6f4',
-    'text_secondary':'#a6adc8',
-    'text_accent':   '#cba6f7',
-    'border':        '#45475a',
-    'success':       '#a6e3a1',
-    'log_cmd':       '#89b4fa',
-    'log_result':    '#a6e3a1',
-    'log_warning':   '#fab387',
-    'log_error':     '#f38ba8',
-    'phi_zero':      '#a6e3a1',
-    'phi_nonzero':   '#fab387',
+# ── Paleta ────────────────────────────────────────────────────────────────────
+PALETTE = {
+    "bg":      "#1e1e2e",
+    "panel":   "#2a2a3d",
+    "card":    "#313244",
+    "accent":  "#cba6f7",
+    "green":   "#a6e3a1",
+    "red":     "#f38ba8",
+    "yellow":  "#f9e2af",
+    "blue":    "#89b4fa",
+    "text":    "#cdd6f4",
+    "subtext": "#9399b2",
+    "border":  "#45475a",
 }
 
-# ── Configuraciones predefinidas del Excel ──────────────────────────────────
+# ── Predefinidos ──────────────────────────────────────────────────────────────
 PREDEFINIDOS = {
-    "N=10": {
-        "sistema": "ABCDEFGHIJ",
-        "estado":  "1000000000",
-        "csv":     "data/N10C.csv",
-    },
-    "N=15": {
-        "sistema": "ABCDEFGHIJKLMNO",
-        "estado":  "100000000000000",
-        "csv":     "data/N15C.csv",
-    },
-    "N=20": {
-        "sistema": "ABCDEFGHIJKLMNOPQRST",
-        "estado":  "10000000000000000000",
-        "csv":     "data/N20C.csv",
-    },
-    "N=22": {
-        "sistema": "ABCDEFGHIJKLMNOPQRSTUV",
-        "estado":  "1000000000000000000000",
-        "csv":     "data/N22C.csv",
-    },
-    "N=25": {
-        "sistema": "ABCDEFGHIJKLMNOPQRSTUVWXY",
-        "estado":  "1000000000000000000000000",
-        "csv":     "data/N25C.csv",
-    },
+    "N=10": {"sistema": "ABCDEFGHIJ",              "estado": "1000000000",            "csv": "data/N10C.csv"},
+    "N=15": {"sistema": "ABCDEFGHIJKLMNO",          "estado": "100000000000000",       "csv": "data/N15C.csv"},
+    "N=20": {"sistema": "ABCDEFGHIJKLMNOPQRST",     "estado": "10000000000000000000",  "csv": "data/N20C.csv"},
+    "N=22": {"sistema": "ABCDEFGHIJKLMNOPQRSTUV",   "estado": "1000000000000000000000","csv": "data/N22C.csv"},
+    "N=25": {"sistema": "ABCDEFGHIJKLMNOPQRSTUVWXY","estado": "1000000000000000000000000","csv": "data/N25C.csv"},
 }
 
-# ── Hojas Excel por N ──────────────────────────────────────────────────────
-HOJAS_EXCEL = {
-    10: '10A-Elementos',
-    15: '15B-Elementos',
-    20: '20A-Elementos',
-    22: '22A-Elementos',
-    25: '25A-Elementos',
-}
+HOJAS_EXCEL = {10: '10A-Elementos', 15: '15B-Elementos', 20: '20A-Elementos',
+               22: '22A-Elementos', 25: '25A-Elementos'}
 
-# ── Suites de pruebas predefinidas ────────────────────────────────────────
 SUITES = {
     'N=10': {
-        'sistema': 'ABCDEFGHIJ',
-        'estado':  '1000000000',
-        'csv':     'data/N10C.csv',
+        'sistema': 'ABCDEFGHIJ', 'estado': '1000000000', 'csv': 'data/N10C.csv',
         'pruebas': [
-            ('ABCDEFGHIJ', 'ABCDEFGHIJ'), ('ABCDEFGHIJ', 'ABCDEFGHI'),
-            ('ABCDEFGHIJ', 'BCDEFGHIJ'),  ('ABCDEFGHIJ', 'BCDEFGHI'),
-            ('ABCDEFGHIJ', 'ABDEGHJ'),    ('ABCDEFGHIJ', 'ACEGI'),
-            ('ABCDEFGHIJ', 'BDFHJ'),      ('ABCDEFGHI',  'ABCDEFGHIJ'),
-            ('ABCDEFGHI',  'ABCDEFGHI'),  ('ABCDEFGHI',  'BCDEFGHIJ'),
-            ('ABCDEFGHI',  'BCDEFGHI'),   ('ABCDEFGHI',  'ABDEGHJ'),
-            ('ABCDEFGHI',  'ACEGI'),      ('ABCDEFGHI',  'BDFHJ'),
-            ('BCDEFGHIJ',  'ABCDEFGHIJ'), ('BCDEFGHIJ',  'ABCDEFGHI'),
-            ('BCDEFGHIJ',  'BCDEFGHIJ'),  ('BCDEFGHIJ',  'BCDEFGHI'),
-            ('BCDEFGHIJ',  'ABDEGHJ'),    ('BCDEFGHIJ',  'ACEGI'),
-            ('BCDEFGHIJ',  'BDFHJ'),      ('BCDEFGHI',   'ABCDEFGHIJ'),
-            ('BCDEFGHI',   'ABCDEFGHI'),  ('BCDEFGHI',   'BCDEFGHIJ'),
-            ('BCDEFGHI',   'BCDEFGHI'),   ('BCDEFGHI',   'ABDEGHJ'),
-            ('BCDEFGHI',   'ACEGI'),      ('BCDEFGHI',   'BDFHJ'),
-            ('ABDEGHJ',    'ABCDEFGHIJ'), ('ABDEGHJ',    'ABCDEFGHI'),
-            ('ABDEGHJ',    'BCDEFGHIJ'),  ('ABDEGHJ',    'BCDEFGHI'),
-            ('ABDEGHJ',    'ABDEGHJ'),    ('ABDEGHJ',    'ACEGI'),
-            ('ABDEGHJ',    'BDFHJ'),      ('ACEGI',      'ABCDEFGHIJ'),
-            ('ACEGI',      'ABCDEFGHI'),  ('ACEGI',      'BCDEFGHIJ'),
-            ('ACEGI',      'BCDEFGHI'),   ('ACEGI',      'ABDEGHJ'),
-            ('ACEGI',      'ACEGI'),      ('ACEGI',      'BDFHJ'),
-            ('BDFHJ',      'ABCDEFGHIJ'), ('BDFHJ',      'ABCDEFGHI'),
-            ('BDFHJ',      'BCDEFGHIJ'),  ('BDFHJ',      'BCDEFGHI'),
-            ('BDFHJ',      'ABDEGHJ'),    ('BDFHJ',      'ACEGI'),
-            ('BDFHJ',      'BDFHJ'),
+            ('ABCDEFGHIJ','ABCDEFGHIJ'),('ABCDEFGHIJ','ABCDEFGHI'),
+            ('ABCDEFGHIJ','BCDEFGHIJ'), ('ABCDEFGHIJ','BCDEFGHI'),
+            ('ABCDEFGHIJ','ABDEGHJ'),   ('ABCDEFGHIJ','ACEGI'),
+            ('ABCDEFGHIJ','BDFHJ'),     ('ABCDEFGHI', 'ABCDEFGHIJ'),
+            ('ABCDEFGHI', 'ABCDEFGHI'), ('ABCDEFGHI', 'BCDEFGHIJ'),
+            ('ABCDEFGHI', 'BCDEFGHI'),  ('ABCDEFGHI', 'ABDEGHJ'),
+            ('ABCDEFGHI', 'ACEGI'),     ('ABCDEFGHI', 'BDFHJ'),
+            ('BCDEFGHIJ', 'ABCDEFGHIJ'),('BCDEFGHIJ', 'ABCDEFGHI'),
+            ('BCDEFGHIJ', 'BCDEFGHIJ'), ('BCDEFGHIJ', 'BCDEFGHI'),
+            ('BCDEFGHIJ', 'ABDEGHJ'),   ('BCDEFGHIJ', 'ACEGI'),
+            ('BCDEFGHIJ', 'BDFHJ'),     ('BCDEFGHI',  'ABCDEFGHIJ'),
+            ('BCDEFGHI',  'ABCDEFGHI'), ('BCDEFGHI',  'BCDEFGHIJ'),
+            ('BCDEFGHI',  'BCDEFGHI'),  ('BCDEFGHI',  'ABDEGHJ'),
+            ('BCDEFGHI',  'ACEGI'),     ('BCDEFGHI',  'BDFHJ'),
+            ('ABDEGHJ',   'ABCDEFGHIJ'),('ABDEGHJ',   'ABCDEFGHI'),
+            ('ABDEGHJ',   'BCDEFGHIJ'), ('ABDEGHJ',   'BCDEFGHI'),
+            ('ABDEGHJ',   'ABDEGHJ'),   ('ABDEGHJ',   'ACEGI'),
+            ('ABDEGHJ',   'BDFHJ'),     ('ACEGI',     'ABCDEFGHIJ'),
+            ('ACEGI',     'ABCDEFGHI'), ('ACEGI',     'BCDEFGHIJ'),
+            ('ACEGI',     'BCDEFGHI'),  ('ACEGI',     'ABDEGHJ'),
+            ('ACEGI',     'ACEGI'),     ('ACEGI',     'BDFHJ'),
+            ('BDFHJ',     'ABCDEFGHIJ'),('BDFHJ',     'ABCDEFGHI'),
+            ('BDFHJ',     'BCDEFGHIJ'), ('BDFHJ',     'BCDEFGHI'),
+            ('BDFHJ',     'ABDEGHJ'),   ('BDFHJ',     'ACEGI'),
+            ('BDFHJ',     'BDFHJ'),
         ],
     },
     'N=15': {
-        'sistema': 'ABCDEFGHIJKLMNO',
-        'estado':  '100000000000000',
-        'csv':     'data/N15C.csv',
+        'sistema': 'ABCDEFGHIJKLMNO', 'estado': '100000000000000', 'csv': 'data/N15C.csv',
         'pruebas': [
-            ('ABCDEFGHIJKLMNO', 'ABCDEFGHIJKLMNO'), ('ABCDEFGHIJKLMNO', 'ABCDEFGHIJKLMN'),
-            ('ABCDEFGHIJKLMNO', 'BCDEFGHIJKLMNO'),  ('ABCDEFGHIJKLMNO', 'BCDEFGHIJKLMN'),
-            ('ABCDEFGHIJKLMNO', 'ABDEGHJKMN'),       ('ABCDEFGHIJKLMNO', 'ACEGIKMO'),
-            ('ABCDEFGHIJKLMNO', 'BDFHJLN'),          ('ABCDEFGHIJKLMN',  'ABCDEFGHIJKLMNO'),
-            ('ABCDEFGHIJKLMN',  'ABCDEFGHIJKLMN'),  ('ABCDEFGHIJKLMN',  'BCDEFGHIJKLMNO'),
-            ('ABCDEFGHIJKLMN',  'BCDEFGHIJKLMN'),   ('ABCDEFGHIJKLMN',  'ABDEGHJKMN'),
-            ('ABCDEFGHIJKLMN',  'ACEGIKMO'),         ('ABCDEFGHIJKLMN',  'BDFHJLN'),
-            ('BCDEFGHIJKLMNO',  'ABCDEFGHIJKLMNO'), ('BCDEFGHIJKLMNO',  'ABCDEFGHIJKLMN'),
-            ('BCDEFGHIJKLMNO',  'BCDEFGHIJKLMNO'),  ('BCDEFGHIJKLMNO',  'BCDEFGHIJKLMN'),
-            ('BCDEFGHIJKLMNO',  'ABDEGHJKMN'),       ('BCDEFGHIJKLMNO',  'ACEGIKMO'),
-            ('BCDEFGHIJKLMNO',  'BDFHJLN'),          ('BCDEFGHIJKLMN',   'ABCDEFGHIJKLMNO'),
-            ('BCDEFGHIJKLMN',   'ABCDEFGHIJKLMN'),  ('BCDEFGHIJKLMN',   'BCDEFGHIJKLMNO'),
-            ('BCDEFGHIJKLMN',   'BCDEFGHIJKLMN'),   ('BCDEFGHIJKLMN',   'ABDEGHJKMN'),
-            ('BCDEFGHIJKLMN',   'ACEGIKMO'),         ('BCDEFGHIJKLMN',   'BDFHJLN'),
-            ('ABDEGHJKMN',      'ABCDEFGHIJKLMNO'), ('ABDEGHJKMN',      'ABCDEFGHIJKLMN'),
-            ('ABDEGHJKMN',      'BCDEFGHIJKLMNO'),  ('ABDEGHJKMN',      'BCDEFGHIJKLMN'),
-            ('ABDEGHJKMN',      'ABDEGHJKMN'),       ('ABDEGHJKMN',      'ACEGIKMO'),
-            ('ABDEGHJKMN',      'BDFHJLN'),          ('ACEGIKMO',        'ABCDEFGHIJKLMNO'),
-            ('ACEGIKMO',        'ABCDEFGHIJKLMN'),  ('ACEGIKMO',        'BCDEFGHIJKLMNO'),
-            ('ACEGIKMO',        'BCDEFGHIJKLMN'),   ('ACEGIKMO',        'ABDEGHJKMN'),
-            ('ACEGIKMO',        'ACEGIKMO'),         ('ACEGIKMO',        'BDFHJLN'),
-            ('BDFHJLN',         'ABCDEFGHIJKLMNO'), ('BDFHJLN',         'ABCDEFGHIJKLMN'),
-            ('BDFHJLN',         'BCDEFGHIJKLMNO'),  ('BDFHJLN',         'BCDEFGHIJKLMN'),
-            ('BDFHJLN',         'ABDEGHJKMN'),       ('BDFHJLN',         'ACEGIKMO'),
-            ('BDFHJLN',         'BDFHJLN'),          ('BCDEFGJKLMNO',    'BCDEFGHIJKLMNO'),
+            ('ABCDEFGHIJKLMNO','ABCDEFGHIJKLMNO'),('ABCDEFGHIJKLMNO','ABCDEFGHIJKLMN'),
+            ('ABCDEFGHIJKLMNO','BCDEFGHIJKLMNO'), ('ABCDEFGHIJKLMNO','BCDEFGHIJKLMN'),
+            ('ABCDEFGHIJKLMNO','ABDEGHJKMN'),      ('ABCDEFGHIJKLMNO','ACEGIKMO'),
+            ('ABCDEFGHIJKLMNO','BDFHJLN'),         ('ABCDEFGHIJKLMN', 'ABCDEFGHIJKLMNO'),
+            ('ABCDEFGHIJKLMN', 'ABCDEFGHIJKLMN'), ('ABCDEFGHIJKLMN', 'BCDEFGHIJKLMNO'),
+            ('ABCDEFGHIJKLMN', 'BCDEFGHIJKLMN'),  ('ABCDEFGHIJKLMN', 'ABDEGHJKMN'),
+            ('ABCDEFGHIJKLMN', 'ACEGIKMO'),        ('ABCDEFGHIJKLMN', 'BDFHJLN'),
+            ('BCDEFGHIJKLMNO', 'ABCDEFGHIJKLMNO'),('BCDEFGHIJKLMNO', 'ABCDEFGHIJKLMN'),
+            ('BCDEFGHIJKLMNO', 'BCDEFGHIJKLMNO'), ('BCDEFGHIJKLMNO', 'BCDEFGHIJKLMN'),
+            ('BCDEFGHIJKLMNO', 'ABDEGHJKMN'),      ('BCDEFGHIJKLMNO', 'ACEGIKMO'),
+            ('BCDEFGHIJKLMNO', 'BDFHJLN'),         ('BCDEFGHIJKLMN',  'ABCDEFGHIJKLMNO'),
+            ('BCDEFGHIJKLMN',  'ABCDEFGHIJKLMN'), ('BCDEFGHIJKLMN',  'BCDEFGHIJKLMNO'),
+            ('BCDEFGHIJKLMN',  'BCDEFGHIJKLMN'),  ('BCDEFGHIJKLMN',  'ABDEGHJKMN'),
+            ('BCDEFGHIJKLMN',  'ACEGIKMO'),        ('BCDEFGHIJKLMN',  'BDFHJLN'),
+            ('ABDEGHJKMN',     'ABCDEFGHIJKLMNO'),('ABDEGHJKMN',     'ABCDEFGHIJKLMN'),
+            ('ABDEGHJKMN',     'BCDEFGHIJKLMNO'), ('ABDEGHJKMN',     'BCDEFGHIJKLMN'),
+            ('ABDEGHJKMN',     'ABDEGHJKMN'),      ('ABDEGHJKMN',     'ACEGIKMO'),
+            ('ABDEGHJKMN',     'BDFHJLN'),         ('ACEGIKMO',       'ABCDEFGHIJKLMNO'),
+            ('ACEGIKMO',       'ABCDEFGHIJKLMN'), ('ACEGIKMO',       'BCDEFGHIJKLMNO'),
+            ('ACEGIKMO',       'BCDEFGHIJKLMN'),  ('ACEGIKMO',       'ABDEGHJKMN'),
+            ('ACEGIKMO',       'ACEGIKMO'),        ('ACEGIKMO',       'BDFHJLN'),
+            ('BDFHJLN',        'ABCDEFGHIJKLMNO'),('BDFHJLN',        'ABCDEFGHIJKLMN'),
+            ('BDFHJLN',        'BCDEFGHIJKLMNO'), ('BDFHJLN',        'BCDEFGHIJKLMN'),
+            ('BDFHJLN',        'ABDEGHJKMN'),      ('BDFHJLN',        'ACEGIKMO'),
+            ('BDFHJLN',        'BDFHJLN'),         ('BCDEFGJKLMNO',   'BCDEFGHIJKLMNO'),
         ],
     },
 }
 
-# ── Stirling de segunda especie S(n,k) ─────────────────────────────────────
 def stirling2(n: int, k: int) -> int:
-    if k == 0:
-        return 1 if n == 0 else 0
-    if k > n:
-        return 0
-    return sum((-1) ** (k - j) * comb(k, j) * (j ** n)
-               for j in range(k + 1)) // factorial(k)
+    if k == 0: return 1 if n == 0 else 0
+    if k > n:  return 0
+    return sum((-1)**(k-j)*comb(k,j)*(j**n) for j in range(k+1)) // factorial(k)
 
+
+# ── Widgets auxiliares ────────────────────────────────────────────────────────
+
+class MetricCard(tk.Frame):
+    def __init__(self, parent, title, **kw):
+        P = PALETTE
+        super().__init__(parent, bg=P["card"], relief=tk.FLAT,
+                         highlightthickness=1, highlightbackground=P["border"], **kw)
+        tk.Label(self, text=title, bg=P["card"], fg=P["subtext"],
+                 font=("Segoe UI", 8)).pack(anchor="w", padx=10, pady=(8,2))
+        self._val = tk.StringVar(value="—")
+        self._lbl = tk.Label(self, textvariable=self._val, bg=P["card"],
+                             fg=P["accent"], font=("Segoe UI", 13, "bold"))
+        self._lbl.pack(anchor="w", padx=10, pady=(0,8))
+
+    def set(self, value, color=None):
+        self._val.set(str(value))
+        if color:
+            self._lbl.configure(fg=color)
+
+
+class ColoredLog(tk.Text):
+    _TAGS = {
+        "ok":   ("#a6e3a1", None),
+        "err":  ("#f38ba8", None),
+        "warn": ("#f9e2af", None),
+        "info": ("#89b4fa", None),
+        "head": ("#cba6f7", "bold"),
+    }
+    def __init__(self, parent, **kw):
+        P = PALETTE
+        defaults = dict(bg=P["bg"], fg=P["text"], font=("Consolas", 9),
+                        relief=tk.FLAT, state=tk.DISABLED, wrap=tk.WORD,
+                        selectbackground=P["border"])
+        defaults.update(kw)
+        super().__init__(parent, **defaults)
+        for tag, (fg, weight) in self._TAGS.items():
+            font_spec = ("Consolas", 9, weight) if weight else ("Consolas", 9)
+            self.tag_configure(tag, foreground=fg, font=font_spec)
+
+    def append(self, text: str, tag: str = ""):
+        self.configure(state=tk.NORMAL)
+        self.insert(tk.END, text + "\n", (tag,) if tag else ())
+        self.see(tk.END)
+        self.configure(state=tk.DISABLED)
+
+    def clear(self):
+        self.configure(state=tk.NORMAL)
+        self.delete("1.0", tk.END)
+        self.configure(state=tk.DISABLED)
+
+    def set_content(self, text: str):
+        self.configure(state=tk.NORMAL)
+        self.delete("1.0", tk.END)
+        self.insert("1.0", text)
+        self.configure(state=tk.DISABLED)
+
+
+class ResultsTable(ttk.Treeview):
+    _COLS = ("Estrategia", "k", "Partición", "φ", "Tiempo (s)")
+
+    def __init__(self, parent, **kw):
+        super().__init__(parent, columns=self._COLS, show="headings",
+                         selectmode="browse", **kw)
+        widths = [110, 40, 260, 90, 80]
+        for col, w in zip(self._COLS, widths):
+            self.heading(col, text=col)
+            self.column(col, width=w, minwidth=40, anchor="w")
+        P = PALETTE
+        self.tag_configure("phi_zero",    foreground=P["green"])
+        self.tag_configure("phi_nonzero", foreground=P["yellow"])
+        self.tag_configure("timeout_row", foreground=P["red"])
+
+    def add_row(self, values):
+        try:
+            phi_val = float(values[3])
+            tag = "phi_zero" if phi_val < 1e-9 else "phi_nonzero"
+        except (ValueError, TypeError, IndexError):
+            tag = "timeout_row"
+        self.insert("", tk.END, values=values, tags=(tag,))
+
+    def clear(self):
+        for item in self.get_children():
+            self.delete(item)
+
+
+# ── App principal ─────────────────────────────────────────────────────────────
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("KQNodes / KGeoMIP — Análisis de k-Particiones Óptimas")
-        self.minsize(1100, 720)
-        self.geometry("1280x800")
-        self.resizable(True, True)
-        self.configure(bg=COLORS['bg_main'])
-
-        self._q: queue.Queue = queue.Queue()
-        self._results: list  = []
-        self._updating_predefined = False
-        self._excel_rows: list = []
-        self._prueba_counter: int = 0
-        # Referencias a los últimos resultados (usadas por exportar_a_excel)
-        self._ultimo_res_geo      = None
-        self._ultimo_res_geo_full = None
-        self._ultimo_res_qn       = None
-        self._ultimo_sub       = None
-        self._ultimo_t_geo     = 0.0
-        self._ultimo_t_qn      = 0.0
-        self._ultimo_n_sistema = 0
-        self._ultimo_sistema   = ''
-        # Historial de todos los análisis ejecutados
-        self._historial_analisis: list = []
-
-        self._build_ui()
+        P = PALETTE
+        self.title("GeoMIP — k-Particiones Óptimas  (ADA 2026-1)")
+        self.geometry("1440x860")
+        self.minsize(1100, 700)
+        self.configure(bg=P["bg"])
 
         if _SV_TTK:
             sv_ttk.set_theme("dark")
+        else:
+            style = ttk.Style(self)
+            try:
+                style.theme_use("clam")
+            except tk.TclError:
+                pass
+            style.configure("Treeview", background=P["card"], foreground=P["text"],
+                             fieldbackground=P["card"], rowheight=22, font=("Consolas", 9))
+            style.configure("Treeview.Heading", background=P["panel"],
+                             foreground=P["subtext"], font=("Segoe UI", 9, "bold"))
+            style.map("Treeview", background=[("selected", P["border"])])
+            style.configure("TProgressbar", troughcolor=P["panel"],
+                             background=P["accent"], thickness=6)
+
+        # Estado interno
+        self._q               = queue.Queue()
+        self._results         = []
+        self._historial_analisis = []
+        self._ultimo_res_geo  = None
+        self._ultimo_res_qn   = None
+        self._ultimo_sub      = None
+        self._ultimo_t_geo    = 0.0
+        self._ultimo_t_qn     = 0.0
+        self._ultimo_n_sistema= 0
+        self._ultimo_sistema  = ""
+        self._modo_suite_activo = False
+        self._suite_running   = False
+
+        self._build_ui()
+        self.after(80, self._poll)
 
         if not MODULES_OK:
-            messagebox.showwarning(
-                "Módulos no disponibles",
-                f"No se pudieron cargar los módulos del proyecto:\n{MODULES_ERROR}\n\n"
-                "Asegúrate de ejecutar desde el directorio raíz del proyecto."
-            )
+            self.after(200, lambda: messagebox.showwarning(
+                "Módulos no cargados",
+                f"Error importando módulos del proyecto:\n{MODULES_ERROR}\n\n"
+                "Verifica que el PYTHONPATH y las dependencias estén instaladas."))
 
-        self._poll()
-
-    # ── Construcción de UI ─────────────────────────────────────────────────
+    # ── Construcción de UI ────────────────────────────────────────────────────
 
     def _build_ui(self):
-        C = COLORS
-        root = tk.Frame(self, bg=C['bg_main'])
-        root.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 0))
+        P = PALETTE
+        # Separador superior decorativo
+        tk.Frame(self, height=3, bg=P["accent"]).pack(fill=tk.X)
 
-        left = tk.LabelFrame(
-            root,
-            text="Configuración del Sistema",
-            font=('Segoe UI', 11, 'bold'),
-            bg=C['bg_panel'], fg=C['text_accent'],
-            bd=1, padx=10, pady=8,
-        )
-        left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
-        left.pack_propagate(False)
-        left.configure(width=400)
+        content = tk.Frame(self, bg=P["bg"])
+        content.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
 
-        right = tk.LabelFrame(
-            root,
-            text="Resultados",
-            font=('Segoe UI', 11, 'bold'),
-            bg=C['bg_panel'], fg=C['text_accent'],
-            bd=1, padx=10, pady=8,
-        )
-        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self._build_sidebar(content)
+        self._build_main(content)
+        self._build_statusbar()
 
-        self._build_left(left)
-        self._build_right(right)
-        self._build_bottom()
+    def _build_sidebar(self, parent):
+        P = PALETTE
+        side = tk.Frame(parent, bg=P["panel"], width=300)
+        side.pack(side=tk.LEFT, fill=tk.Y, padx=(8, 4), pady=8)
+        side.pack_propagate(False)
 
-    def _build_left(self, p):
-        C = COLORS
+        # Logo
+        hdr = tk.Frame(side, bg=P["panel"])
+        hdr.pack(fill=tk.X, padx=12, pady=(14, 4))
+        tk.Label(hdr, text="GeoMIP", bg=P["panel"], fg=P["accent"],
+                 font=("Segoe UI", 18, "bold")).pack(anchor="w")
+        tk.Label(hdr, text="k-Particiones Óptimas  ·  ADA 2026-1",
+                 bg=P["panel"], fg=P["subtext"], font=("Segoe UI", 8)).pack(anchor="w")
+        tk.Frame(side, height=1, bg=P["border"]).pack(fill=tk.X, padx=8, pady=6)
 
-        def section_sep(text, row_):
-            frm = tk.Frame(p, bg=C['bg_panel'])
-            frm.grid(row=row_, column=0, columnspan=2, sticky="ew",
-                     pady=(9, 3))
-            frm.columnconfigure(1, weight=1)
-            tk.Label(
-                frm, text=text.upper(),
-                font=('Segoe UI', 8, 'bold'),
-                fg=C['text_accent'], bg=C['bg_panel'],
-            ).grid(row=0, column=0, padx=(0, 8))
-            tk.Frame(frm, height=1, bg=C['border']).grid(
-                row=0, column=1, sticky="ew")
-            return row_ + 1
+        def row(label, widget_fn):
+            f = tk.Frame(side, bg=P["panel"])
+            f.pack(fill=tk.X, padx=12, pady=2)
+            tk.Label(f, text=label, bg=P["panel"], fg=P["subtext"],
+                     font=("Segoe UI", 8), width=12, anchor="w").pack(side=tk.LEFT)
+            widget_fn(f)
 
-        def field(label_text, attr, row_):
-            tk.Label(
-                p, text=label_text, anchor="e",
-                font=('Segoe UI', 9), width=14,
-                fg=C['text_secondary'], bg=C['bg_panel'],
-            ).grid(row=row_, column=0, sticky="e", padx=(0, 6), pady=3)
-            var = tk.StringVar()
-            tk.Entry(
-                p, textvariable=var,
-                bg=C['bg_input'], fg=C['text_primary'],
-                insertbackground=C['text_primary'],
-                relief=tk.FLAT, font=('Segoe UI', 9),
-                highlightbackground=C['border'], highlightthickness=1,
-            ).grid(row=row_, column=1, sticky="ew", pady=3)
-            setattr(self, attr, var)
-            return row_ + 1
+        # Predefinido selector
+        self._pre_var = tk.StringVar(value="N=10")
+        row("Sistema", lambda f: ttk.Combobox(
+            f, textvariable=self._pre_var,
+            values=list(PREDEFINIDOS.keys()), state="readonly", width=16
+        ).pack(side=tk.LEFT))
+        self._pre_var.trace_add("write", lambda *_: self._on_predefinido())
 
-        row = 0
+        # CSV
+        self._csv_var = tk.StringVar(value="data/N10C.csv")
+        def _csv_row(f):
+            e = tk.Entry(f, textvariable=self._csv_var, width=14,
+                         bg=P["card"], fg=P["text"], insertbackground=P["text"],
+                         relief=tk.FLAT, font=("Consolas", 9))
+            e.pack(side=tk.LEFT, padx=(0, 4))
+            tk.Button(f, text="…", command=self._browse,
+                      bg=P["border"], fg=P["text"], relief=tk.FLAT,
+                      width=2, cursor="hand2").pack(side=tk.LEFT)
+        row("CSV", _csv_row)
 
-        # ── Sistema predefinido ───────────────────────────────────────────
-        row = section_sep("Sistema predefinido", row)
+        self._csv_status_lbl = tk.Label(side, text="", bg=P["panel"],
+                                        fg=P["subtext"], font=("Segoe UI", 8),
+                                        wraplength=270, justify="left")
+        self._csv_status_lbl.pack(anchor="w", padx=14)
+        self._csv_var.trace_add("write", lambda *_: self._actualizar_csv_status())
 
-        self._n_var = tk.StringVar(value="— seleccionar —")
-        opts = ["— seleccionar —"] + list(PREDEFINIDOS) + ["Personalizado"]
-        om = tk.OptionMenu(p, self._n_var, *opts, command=self._on_n)
-        om.config(
-            width=26,
-            bg=C['bg_input'], fg=C['text_primary'],
-            activebackground=C['bg_hover'], activeforeground=C['text_primary'],
-            font=('Segoe UI', 9),
-            relief=tk.FLAT, bd=1,
-            highlightbackground=C['border'], highlightthickness=1,
-        )
-        om['menu'].config(
-            bg=C['bg_input'], fg=C['text_primary'],
-            activebackground=C['bg_hover'], activeforeground=C['text_primary'],
-            font=('Segoe UI', 9),
-        )
-        om.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(2, 4))
-        row += 1
+        # Estado, sistema
+        self._est_var = tk.StringVar(value="1000000000")
+        self._sys_var = tk.StringVar(value="ABCDEFGHIJ")
+        row("Estado", lambda f: tk.Entry(
+            f, textvariable=self._est_var, width=20,
+            bg=P["card"], fg=P["text"], insertbackground=P["text"],
+            relief=tk.FLAT, font=("Consolas", 9)).pack(side=tk.LEFT))
+        row("Sistema", lambda f: tk.Entry(
+            f, textvariable=self._sys_var, width=20,
+            bg=P["card"], fg=P["text"], insertbackground=P["text"],
+            relief=tk.FLAT, font=("Consolas", 9)).pack(side=tk.LEFT))
 
-        # ── Sistema completo ──────────────────────────────────────────────
-        row = section_sep("Sistema", row)
-        row = field("Variables:",  "_sys_var", row)
-        row = field("Estado:",     "_est_var", row)
+        tk.Frame(side, height=1, bg=P["border"]).pack(fill=tk.X, padx=8, pady=6)
 
-        # CSV (label + entry + browse en la misma fila)
-        tk.Label(
-            p, text="CSV:", anchor="e",
-            font=('Segoe UI', 9), width=14,
-            fg=C['text_secondary'], bg=C['bg_panel'],
-        ).grid(row=row, column=0, sticky="e", padx=(0, 6), pady=3)
+        # Alcance / Mecanismo
+        self._alc_var = tk.StringVar(value="ABCDEFGHIJ")
+        self._mec_var = tk.StringVar(value="ABCDEFGHIJ")
+        row("Alcance", lambda f: tk.Entry(
+            f, textvariable=self._alc_var, width=20,
+            bg=P["card"], fg=P["text"], insertbackground=P["text"],
+            relief=tk.FLAT, font=("Consolas", 9)).pack(side=tk.LEFT))
+        row("Mecanismo", lambda f: tk.Entry(
+            f, textvariable=self._mec_var, width=20,
+            bg=P["card"], fg=P["text"], insertbackground=P["text"],
+            relief=tk.FLAT, font=("Consolas", 9)).pack(side=tk.LEFT))
 
-        self._csv_var = tk.StringVar()
-        cf = tk.Frame(p, bg=C['bg_panel'])
-        cf.grid(row=row, column=1, sticky="ew", pady=3)
-        tk.Entry(
-            cf, textvariable=self._csv_var,
-            bg=C['bg_input'], fg=C['text_primary'],
-            insertbackground=C['text_primary'],
-            relief=tk.FLAT, font=('Segoe UI', 9),
-            highlightbackground=C['border'], highlightthickness=1,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Button(
-            cf, text="…", command=self._browse,
-            bg=C['bg_hover'], fg=C['text_primary'],
-            activebackground=C['border'], activeforeground=C['text_primary'],
-            relief=tk.FLAT, font=('Segoe UI', 10), padx=6, pady=2,
-        ).pack(side=tk.RIGHT, padx=(4, 0))
-        row += 1
+        tk.Frame(side, height=1, bg=P["border"]).pack(fill=tk.X, padx=8, pady=6)
 
-        self._csv_status_lbl = tk.Label(
-            p, text="", anchor="w",
-            font=('Segoe UI', 8),
-            fg=C['text_secondary'], bg=C['bg_panel'],
-        )
-        self._csv_status_lbl.grid(
-            row=row, column=0, columnspan=2, sticky="w", pady=(0, 2))
-        row += 1
+        # Opciones k
+        self._k_var = tk.StringVar(value="2")
+        row("k (particiones)", lambda f: ttk.Combobox(
+            f, textvariable=self._k_var,
+            values=["2","3","4","5"], state="readonly", width=6
+        ).pack(side=tk.LEFT))
 
-        # ── Subsistema ────────────────────────────────────────────────────
-        row = section_sep("Subsistema", row)
-        row = field("Alcance (t+1):", "_alc_var", row)
-        row = field("Mecanismo (t):", "_mec_var", row)
-
-        # ── Estrategias ───────────────────────────────────────────────────
-        row = section_sep("Estrategias", row)
-
+        # Estrategias
         self._use_geo  = tk.BooleanVar(value=True)
         self._use_qnod = tk.BooleanVar(value=True)
+        chk_f = tk.Frame(side, bg=P["panel"])
+        chk_f.pack(fill=tk.X, padx=12, pady=4)
+        tk.Label(chk_f, text="Estrategias:", bg=P["panel"], fg=P["subtext"],
+                 font=("Segoe UI", 8)).pack(anchor="w")
+        chk_row = tk.Frame(chk_f, bg=P["panel"])
+        chk_row.pack(anchor="w")
+        tk.Checkbutton(chk_row, text="KGeoMIP", variable=self._use_geo,
+                       bg=P["panel"], fg=P["text"], activebackground=P["panel"],
+                       selectcolor=P["card"], font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        tk.Checkbutton(chk_row, text="KQNodes", variable=self._use_qnod,
+                       bg=P["panel"], fg=P["text"], activebackground=P["panel"],
+                       selectcolor=P["card"], font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=8)
 
-        for text, var in [
-            ("KGeoMIP  (k=2)  — bipartición óptima",    self._use_geo),
-            ("KQNodes (k=3,4,5) — k-partición óptima",  self._use_qnod),
-        ]:
-            tk.Checkbutton(
-                p, text=text, variable=var,
-                bg=C['bg_panel'], fg=C['text_primary'],
-                selectcolor=C['bg_input'],
-                activebackground=C['bg_panel'], activeforeground=C['text_primary'],
-                font=('Segoe UI', 9),
-            ).grid(row=row, column=0, columnspan=2, sticky="w", pady=2)
-            row += 1
+        tk.Frame(side, height=1, bg=P["border"]).pack(fill=tk.X, padx=8, pady=6)
 
-        # ── Ejecución ─────────────────────────────────────────────────────
-        row = section_sep("Ejecución", row)
+        # Botones de acción
+        def btn(parent, text, cmd, color=None):
+            c = color or P["border"]
+            tk.Button(parent, text=text, command=cmd,
+                      bg=c, fg=P["text"],
+                      activebackground=P["border"], activeforeground=P["text"],
+                      relief=tk.FLAT, font=("Segoe UI", 9, "bold"),
+                      padx=8, pady=6, cursor="hand2", width=24
+                      ).pack(fill=tk.X, padx=12, pady=2)
 
-        self._btn_run = tk.Button(
-            p, text="▶  Ejecutar análisis",
-            font=('Segoe UI', 11, 'bold'),
-            bg=C['accent'], fg="white",
-            activebackground=C['accent_light'], activeforeground="white",
-            relief=tk.FLAT, command=self._run,
-            padx=8, pady=9, cursor="hand2",
-        )
-        self._btn_run.grid(
-            row=row, column=0, columnspan=2, sticky="ew", pady=(2, 5))
-        row += 1
+        btn(side, "▶  Ejecutar análisis", self._run, P["accent"].replace("f7","a5") if True else P["accent"])
+        btn(side, "▶  Ejecutar suite",    self._ejecutar_suite)
+        btn(side, "📤  Exportar a Excel", self._exportar_a_excel)
+        btn(side, "💾  Guardar CSV",       self._save)
+        btn(side, "🗑  Limpiar",           self._clear)
 
-        self._btn_suite = tk.Button(
-            p, text="⚡ Ejecutar suite",
-            font=('Segoe UI', 10, 'bold'),
-            bg='#7c3aed', fg="white",
-            activebackground='#8b5cf6', activeforeground="white",
-            relief=tk.FLAT, command=self._ejecutar_suite,
-            padx=8, pady=7, cursor="hand2",
-        )
-        self._btn_suite.grid(
-            row=row, column=0, columnspan=2, sticky="ew", pady=(0, 5))
-        row += 1
+        tk.Frame(side, height=1, bg=P["border"]).pack(fill=tk.X, padx=8, pady=6)
+        tk.Label(side, text="📊 Completar plataformas", bg=P["panel"], fg=P["subtext"],
+                 font=("Segoe UI", 8), cursor="hand2").pack(anchor="w", padx=14, pady=2)
+        self.bind_all("<F5>", lambda e: self._run())
 
-        tk.Button(
-            p, text="Limpiar todo", command=self._clear,
-            bg=C['bg_hover'], fg=C['text_secondary'],
-            activebackground=C['border'], activeforeground=C['text_primary'],
-            relief=tk.FLAT, font=('Segoe UI', 9),
-            padx=8, pady=5,
-        ).grid(row=row, column=0, columnspan=2, sticky="ew")
+        # Inicializar status del CSV
+        self.after(200, self._actualizar_csv_status)
 
-        p.columnconfigure(1, weight=1)
+    def _build_main(self, parent):
+        P = PALETTE
+        main = tk.Frame(parent, bg=P["bg"])
+        main.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(4, 8), pady=8)
 
-        # ── Trazas ────────────────────────────────────────────────────────
-        def _on_campo_modificado(*args):
-            if self._updating_predefined:
-                return
-            actual_sis = self._sys_var.get()
-            actual_est = self._est_var.get()
-            actual_alc = self._alc_var.get()
-            actual_mec = self._mec_var.get()
-            for nombre, vals in PREDEFINIDOS.items():
-                pred_alc = vals.get('alcance', vals['sistema'])
-                pred_mec = vals.get('mecanismo', vals['sistema'])
-                if (actual_sis == vals['sistema'] and
-                        actual_est == vals['estado']  and
-                        actual_alc == pred_alc        and
-                        actual_mec == pred_mec):
-                    if self._n_var.get() != nombre:
-                        self._n_var.set(nombre)
-                    return
-            self._n_var.set('Personalizado')
+        # Metric cards row
+        cards_f = tk.Frame(main, bg=P["bg"])
+        cards_f.pack(fill=tk.X, pady=(0, 6))
+        self._card_phi  = MetricCard(cards_f, "φ mínimo (KGeoMIP)")
+        self._card_time = MetricCard(cards_f, "Tiempo total")
+        self._card_part = MetricCard(cards_f, "Bipartición óptima")
+        self._card_n    = MetricCard(cards_f, "Subsistema n")
+        for c in [self._card_phi, self._card_time, self._card_part, self._card_n]:
+            c.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=4, ipady=4)
 
-        for var in [self._sys_var, self._est_var,
-                    self._alc_var, self._mec_var]:
-            var.trace_add('write', _on_campo_modificado)
+        # Tabbed area
+        nb = ttk.Notebook(main)
+        nb.pack(fill=tk.BOTH, expand=True)
+        self._nb = nb
 
-        self._csv_var.trace_add(
-            'write', lambda *a: self._actualizar_csv_status())
+        self._build_tab_analisis(nb)
+        self._build_tab_suites(nb)
+        self._build_tab_validacion(nb)
+        self._build_tab_historial(nb)
 
-    def _build_right(self, p):
-        C = COLORS
+    def _build_tab_analisis(self, nb):
+        P = PALETTE
+        frm = tk.Frame(nb, bg=P["bg"])
+        nb.add(frm, text=" 🔬 Análisis ")
 
-        # ── Estilos ttk (sv-ttk aplica su propio tema dark encima) ───────────
-        style = ttk.Style()
-        style.configure("Dark.Treeview",
-                        rowheight=22,
-                        font=('Consolas', 9))
-        style.configure("Dark.Treeview.Heading",
-                        font=('Segoe UI', 9, 'bold'))
-        style.configure("Dark.TNotebook.Tab",
-                        padding=[10, 4],
-                        font=('Segoe UI', 9, 'bold'))
+        pane = tk.PanedWindow(frm, orient=tk.HORIZONTAL, bg=P["bg"],
+                              sashwidth=5, sashrelief=tk.FLAT)
+        pane.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
-        # ── Log ───────────────────────────────────────────────────────────
-        log_frm = tk.LabelFrame(
-            p, text="Progreso en tiempo real",
-            font=('Segoe UI', 11, 'bold'),
-            bg=C['bg_panel'], fg=C['text_accent'],
-            bd=1, padx=6, pady=6,
-        )
-        log_frm.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+        # Log panel
+        log_f = tk.Frame(pane, bg=P["bg"])
+        tk.Label(log_f, text="Registro de ejecución", bg=P["bg"],
+                 fg=P["subtext"], font=("Segoe UI", 8)).pack(anchor="w", padx=4)
+        self._log = ColoredLog(log_f)
+        vsb = tk.Scrollbar(log_f, command=self._log.yview, bg=P["panel"])
+        self._log.configure(yscrollcommand=vsb.set)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+        self._log.pack(fill=tk.BOTH, expand=True, padx=(4, 0))
+        pane.add(log_f, minsize=300)
 
-        self._log = tk.Text(
-            log_frm, height=9, wrap=tk.WORD,
-            state=tk.DISABLED,
-            bg=C['bg_main'], fg=C['text_primary'],
-            font=('Consolas', 10), relief=tk.FLAT,
-            insertbackground=C['text_primary'],
-            selectbackground=C['bg_hover'],
-        )
-        log_sb = tk.Scrollbar(log_frm, command=self._log.yview,
-                              bg=C['bg_panel'])
-        self._log.configure(yscrollcommand=log_sb.set)
-        log_sb.pack(side=tk.RIGHT, fill=tk.Y)
-        self._log.pack(fill=tk.BOTH, expand=True)
+        # Results panel
+        res_f = tk.Frame(pane, bg=P["bg"])
+        tk.Label(res_f, text="Resultados por estrategia", bg=P["bg"],
+                 fg=P["subtext"], font=("Segoe UI", 8)).pack(anchor="w", padx=4)
+        tree_f = tk.Frame(res_f, bg=P["bg"])
+        tree_f.pack(fill=tk.BOTH, expand=True)
+        self._tree = ResultsTable(tree_f)
+        vsb2 = tk.Scrollbar(tree_f, command=self._tree.yview, bg=P["panel"])
+        self._tree.configure(yscrollcommand=vsb2.set)
+        vsb2.pack(side=tk.RIGHT, fill=tk.Y)
+        self._tree.pack(fill=tk.BOTH, expand=True, padx=(0, 0))
 
-        self._log.tag_config("ok",   foreground=C['log_result'])
-        self._log.tag_config("warn", foreground=C['log_warning'])
-        self._log.tag_config("err",  foreground=C['log_error'])
-        self._log.tag_config("info", foreground=C['log_cmd'])
+        # Sub-notebook analysis tabs
+        sub_nb = ttk.Notebook(res_f)
+        sub_nb.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
+        self._sub_nb = sub_nb
 
-        # ── Tabla de resultados ────────────────────────────────────────────
-        tbl_frm = tk.LabelFrame(
-            p, text="Tabla de resultados",
-            font=('Segoe UI', 11, 'bold'),
-            bg=C['bg_panel'], fg=C['text_accent'],
-            bd=1, padx=6, pady=6,
-        )
-        tbl_frm.pack(fill=tk.X, pady=(0, 8))
+        def _txt_tab(label):
+            f = tk.Frame(sub_nb, bg=P["bg"])
+            sub_nb.add(f, text=label)
+            t = ColoredLog(f, wrap=tk.WORD)
+            vsb = tk.Scrollbar(f, command=t.yview, bg=P["panel"])
+            t.configure(yscrollcommand=vsb.set)
+            vsb.pack(side=tk.RIGHT, fill=tk.Y)
+            t.pack(fill=tk.BOTH, expand=True)
+            return t
 
-        cols = ("Estrategia", "k", "Partición", "Pérdida (φ)", "Tiempo (s)")
-        self._tree = ttk.Treeview(
-            tbl_frm, columns=cols,
-            show="headings", height=5,
-            style="Dark.Treeview",
-        )
-        widths = (100, 45, 320, 100, 90)
+        self._tab_correctitud = _txt_tab(" ✔ Correctitud ")
+        self._tab_complejidad = _txt_tab(" ⚙ Complejidad ")
+        self._tab_eficiencia  = _txt_tab(" ⚡ Eficiencia ")
+        self._tab_comparacion = _txt_tab(" ⚖ Comparación ")
+
+        pane.add(res_f, minsize=400)
+
+    def _build_tab_suites(self, nb):
+        P = PALETTE
+        frm = tk.Frame(nb, bg=P["bg"])
+        nb.add(frm, text=" 🧪 Suites ")
+
+        top = tk.Frame(frm, bg=P["panel"])
+        top.pack(fill=tk.X, padx=6, pady=6)
+
+        tk.Label(top, text="Suite:", bg=P["panel"], fg=P["subtext"],
+                 font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=8)
+        self._suite_var = tk.StringVar(value=list(SUITES.keys())[0])
+        ttk.Combobox(top, textvariable=self._suite_var,
+                     values=list(SUITES.keys()), state="readonly", width=10
+                     ).pack(side=tk.LEFT, padx=4)
+
+        tk.Button(top, text="▶ Ejecutar suite", command=self._ejecutar_suite,
+                  bg=P["accent"].replace("f7","a5") if True else P["accent"],
+                  fg=P["text"], relief=tk.FLAT, font=("Segoe UI", 9, "bold"),
+                  padx=10, pady=4, cursor="hand2").pack(side=tk.LEFT, padx=8)
+
+        self._suite_pb = ttk.Progressbar(top, mode="determinate", length=200)
+        self._suite_pb.pack(side=tk.LEFT, padx=8)
+        self._suite_lbl = tk.StringVar(value="")
+        tk.Label(top, textvariable=self._suite_lbl, bg=P["panel"],
+                 fg=P["subtext"], font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=6)
+
+        # Suite results tree
+        cols = ("Prueba", "Alcance", "Mecanismo", "n", "φ Geo", "φ QN", "t(s)")
+        suite_tree_f = tk.Frame(frm, bg=P["bg"])
+        suite_tree_f.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
+        self._suite_tree = ttk.Treeview(suite_tree_f, columns=cols,
+                                        show="headings", selectmode="browse")
+        widths = [50, 160, 160, 40, 90, 90, 70]
         for col, w in zip(cols, widths):
-            self._tree.heading(col, text=col)
-            self._tree.column(col, width=w, minwidth=w)
+            self._suite_tree.heading(col, text=col)
+            self._suite_tree.column(col, width=w, minwidth=30)
+        self._suite_tree.tag_configure("phi_zero",    foreground=P["green"])
+        self._suite_tree.tag_configure("phi_nonzero", foreground=P["yellow"])
+        self._suite_tree.tag_configure("error_row",   foreground=P["red"])
+        vsb = tk.Scrollbar(suite_tree_f, command=self._suite_tree.yview, bg=P["panel"])
+        self._suite_tree.configure(yscrollcommand=vsb.set)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+        self._suite_tree.pack(fill=tk.BOTH, expand=True)
 
-        vsb = ttk.Scrollbar(tbl_frm, orient=tk.VERTICAL,
-                            command=self._tree.yview)
-        hsb = ttk.Scrollbar(tbl_frm, orient=tk.HORIZONTAL,
-                            command=self._tree.xview)
-        self._tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+    def _build_tab_validacion(self, nb):
+        P = PALETTE
+        frm = tk.Frame(nb, bg=P["bg"])
+        nb.add(frm, text=" ✅ Validación §5.2.2 ")
+
+        btn_bar = tk.Frame(frm, bg=P["panel"])
+        btn_bar.pack(fill=tk.X, padx=6, pady=6)
+
+        def vbtn(text, cmd):
+            tk.Button(btn_bar, text=text, command=cmd,
+                      bg=P["border"], fg=P["text"], relief=tk.FLAT,
+                      font=("Segoe UI", 9), padx=8, pady=4,
+                      cursor="hand2").pack(side=tk.LEFT, padx=4, pady=4)
+
+        vbtn("Generar casos", self._run_val_generar)
+        vbtn("Validar KGeoMIP", self._run_val_kgeomip)
+        vbtn("Validar KQNodes", self._run_val_kqnodes)
+        vbtn("Validar ambas", self._run_val_ambas)
+
+        val_f = tk.Frame(frm, bg=P["bg"])
+        val_f.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
+        self._tab_validacion_txt = ColoredLog(val_f, wrap=tk.NONE)
+        vsb = tk.Scrollbar(val_f, command=self._tab_validacion_txt.yview, bg=P["panel"])
+        hsb = tk.Scrollbar(val_f, orient=tk.HORIZONTAL,
+                           command=self._tab_validacion_txt.xview, bg=P["panel"])
+        self._tab_validacion_txt.configure(yscrollcommand=vsb.set,
+                                           xscrollcommand=hsb.set)
+        self._tab_validacion_txt.tag_configure("info", foreground=P["blue"])
+        self._tab_validacion_txt.tag_configure("ok",   foreground=P["green"])
+        self._tab_validacion_txt.tag_configure("warn", foreground=P["yellow"])
+        self._tab_validacion_txt.tag_configure("err",  foreground=P["red"])
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
         hsb.pack(side=tk.BOTTOM, fill=tk.X)
-        self._tree.pack(fill=tk.X)
+        self._tab_validacion_txt.pack(fill=tk.BOTH, expand=True)
 
-        self._tree.tag_configure("phi_zero",
-                                 background='#1e2d20',
-                                 foreground=C['phi_zero'])
-        self._tree.tag_configure("phi_nonzero",
-                                 foreground=C['phi_nonzero'])
-        self._tree.tag_configure("timeout_row",
-                                 foreground=C['text_secondary'])
+    def _build_tab_historial(self, nb):
+        P = PALETTE
+        frm = tk.Frame(nb, bg=P["bg"])
+        nb.add(frm, text=" 📋 Historial ")
 
-        # ── Análisis Automático — Notebook con 5 pestañas ─────────────────
-        anal_frm = tk.LabelFrame(
-            p, text="Análisis Automático",
-            font=('Segoe UI', 11, 'bold'),
-            bg=C['bg_panel'], fg=C['text_accent'],
-            bd=1, padx=4, pady=4,
-        )
-        anal_frm.pack(fill=tk.BOTH, expand=True)
+        top = tk.Frame(frm, bg=P["panel"])
+        top.pack(fill=tk.X, padx=6, pady=6)
+        tk.Button(top, text="📤 Exportar historial",
+                  command=self._exportar_historial_excel,
+                  bg=P["border"], fg=P["text"], relief=tk.FLAT,
+                  font=("Segoe UI", 9), padx=8, pady=4,
+                  cursor="hand2").pack(side=tk.LEFT, padx=4)
+        tk.Button(top, text="📊 Completar plataformas",
+                  command=self._completar_plataformas,
+                  bg=P["border"], fg=P["text"], relief=tk.FLAT,
+                  font=("Segoe UI", 9), padx=8, pady=4,
+                  cursor="hand2").pack(side=tk.LEFT, padx=4)
+        tk.Button(top, text="🗑 Limpiar historial",
+                  command=self._limpiar_historial,
+                  bg=P["border"], fg=P["text"], relief=tk.FLAT,
+                  font=("Segoe UI", 9), padx=8, pady=4).pack(side=tk.LEFT, padx=4)
 
-        nb = ttk.Notebook(anal_frm, style="Dark.TNotebook")
-        nb.pack(fill=tk.BOTH, expand=True)
+        cols = ("#", "Alcance", "Mecanismo", "n", "φ Geo", "Bipartición", "φ QN", "t Geo(s)", "t QN(s)")
+        hist_f = tk.Frame(frm, bg=P["bg"])
+        hist_f.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
+        self._hist_tree = ttk.Treeview(hist_f, columns=cols,
+                                       show="headings", selectmode="browse")
+        widths = [35, 160, 160, 40, 90, 200, 90, 80, 80]
+        for col, w in zip(cols, widths):
+            self._hist_tree.heading(col, text=col)
+            self._hist_tree.column(col, width=w, minwidth=30)
+        self._hist_tree.tag_configure("phi_zero",    foreground=P["green"])
+        self._hist_tree.tag_configure("phi_nonzero", foreground=P["yellow"])
+        vsb = tk.Scrollbar(hist_f, command=self._hist_tree.yview, bg=P["panel"])
+        hsb = tk.Scrollbar(hist_f, orient=tk.HORIZONTAL,
+                           command=self._hist_tree.xview, bg=P["panel"])
+        self._hist_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+        hsb.pack(side=tk.BOTTOM, fill=tk.X)
+        self._hist_tree.pack(fill=tk.BOTH, expand=True)
 
-        def _make_tab(parent, mono=True):
-            frm = tk.Frame(parent, bg=C['bg_main'])
-            txt = tk.Text(
-                frm, wrap=tk.WORD,
-                state=tk.DISABLED,
-                bg=C['bg_main'], fg=C['text_primary'],
-                font=('Consolas', 9 if mono else 9), relief=tk.FLAT,
-                selectbackground=C['bg_hover'],
-            )
-            sb = tk.Scrollbar(frm, command=txt.yview, bg=C['bg_panel'])
-            txt.configure(yscrollcommand=sb.set)
-            sb.pack(side=tk.RIGHT, fill=tk.Y)
-            txt.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-            return frm, txt
-
-        frm1, self._tab_correctitud = _make_tab(nb)
-        frm2, self._tab_complejidad = _make_tab(nb)
-        frm3, self._tab_eficiencia  = _make_tab(nb)
-        frm4, self._tab_comparacion = _make_tab(nb)
-
-        nb.add(frm1, text=" Correctitud ")
-        nb.add(frm2, text=" Complejidad ")
-        nb.add(frm3, text=" Eficiencia  ")
-        nb.add(frm4, text=" Comparación ")
-
-        # ── Pestaña 5: Datos Excel ────────────────────────────────────────
-        frm5 = tk.Frame(nb, bg=C['bg_main'])
-
-        btn_bar = tk.Frame(frm5, bg=C['bg_panel'])
-        btn_bar.pack(fill=tk.X, padx=0, pady=(0, 2))
-
-        tk.Button(
-            btn_bar, text="📤 Exportar a Excel",
-            command=self._exportar_a_excel,
-            bg=C['accent'], fg="white",
-            activebackground=C['accent_light'], activeforeground="white",
-            relief=tk.FLAT, font=('Segoe UI', 9, 'bold'),
-            padx=10, pady=5, cursor="hand2",
-        ).pack(side=tk.LEFT, padx=6, pady=4)
-
-        tk.Button(
-            btn_bar, text="📥 Exportar todo el historial",
-            command=self._exportar_historial_excel,
-            bg='#4f46e5', fg="white",
-            activebackground='#6366f1', activeforeground="white",
-            relief=tk.FLAT, font=('Segoe UI', 9),
-            padx=8, pady=5, cursor="hand2",
-        ).pack(side=tk.LEFT, padx=4, pady=4)
-
-        tk.Button(
-            btn_bar, text="🗑 Limpiar tabla",
-            command=self._limpiar_excel_tab,
-            bg=C['bg_hover'], fg=C['text_secondary'],
-            activebackground=C['border'], activeforeground=C['text_primary'],
-            relief=tk.FLAT, font=('Segoe UI', 9),
-            padx=8, pady=5,
-        ).pack(side=tk.LEFT, padx=4, pady=4)
-
-        tk.Button(
-            btn_bar, text="📊 Completar plataformas",
-            command=self._completar_plataformas,
-            bg='#7c3aed', fg="white",
-            activebackground='#8b5cf6', activeforeground="white",
-            relief=tk.FLAT, font=('Segoe UI', 9),
-            padx=8, pady=5, cursor="hand2",
-        ).pack(side=tk.LEFT, padx=4, pady=4)
-
-        excel_txt_frm = tk.Frame(frm5, bg=C['bg_main'])
-        excel_txt_frm.pack(fill=tk.BOTH, expand=True)
-
-        self._tab_excel_txt = tk.Text(
-            excel_txt_frm, wrap=tk.NONE,
-            state=tk.DISABLED,
-            bg=C['bg_main'], fg=C['text_primary'],
-            font=('Consolas', 8), relief=tk.FLAT,
-            selectbackground=C['bg_hover'],
-        )
-        excel_vsb = tk.Scrollbar(excel_txt_frm,
-                                 command=self._tab_excel_txt.yview,
-                                 bg=C['bg_panel'])
-        excel_hsb = tk.Scrollbar(excel_txt_frm, orient=tk.HORIZONTAL,
-                                 command=self._tab_excel_txt.xview,
-                                 bg=C['bg_panel'])
-        self._tab_excel_txt.configure(
-            yscrollcommand=excel_vsb.set,
-            xscrollcommand=excel_hsb.set)
-        excel_vsb.pack(side=tk.RIGHT, fill=tk.Y)
-        excel_hsb.pack(side=tk.BOTTOM, fill=tk.X)
-        self._tab_excel_txt.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-
-        nb.add(frm5, text=" 📋 Datos Excel ")
-
-    def _build_bottom(self):
-        C = COLORS
-        tk.Frame(self, height=1, bg=C['border']).pack(
-            fill=tk.X, padx=10, pady=(6, 0))
-
-        bar = tk.Frame(self, bg=C['bg_panel'])
-        bar.pack(fill=tk.X, padx=10, pady=(0, 10))
-
+    def _build_statusbar(self):
+        P = PALETTE
+        tk.Frame(self, height=1, bg=P["border"]).pack(fill=tk.X, padx=8, pady=(4, 0))
+        bar = tk.Frame(self, bg=P["panel"])
+        bar.pack(fill=tk.X, padx=8, pady=(0, 6))
         self._status = tk.StringVar(value="Listo")
-        tk.Label(
-            bar, textvariable=self._status, anchor="w",
-            width=45, bg=C['bg_panel'], fg=C['text_secondary'],
-            font=('Segoe UI', 9),
-        ).pack(side=tk.LEFT, padx=8, pady=6)
+        tk.Label(bar, textvariable=self._status, anchor="w", width=50,
+                 bg=P["panel"], fg=P["subtext"], font=("Segoe UI", 9)
+                 ).pack(side=tk.LEFT, padx=10, pady=5)
+        self._pb = ttk.Progressbar(bar, mode="indeterminate", length=180)
+        self._pb.pack(side=tk.LEFT, padx=6, pady=5)
 
-        self._pb = ttk.Progressbar(bar, mode="indeterminate", length=200)
-        self._pb.pack(side=tk.LEFT, padx=6, pady=6)
-
-        tk.Button(
-            bar, text="💾  Guardar resultados",
-            command=self._save,
-            bg=C['bg_hover'], fg=C['text_primary'],
-            activebackground=C['border'], activeforeground=C['text_primary'],
-            relief=tk.FLAT, font=('Segoe UI', 9),
-            padx=10, pady=5, cursor="hand2",
-        ).pack(side=tk.RIGHT, padx=8, pady=6)
-
-    # ── Helpers de UI (thread-safe via _q / poll) ─────────────────────────
+    # ── Helpers UI ────────────────────────────────────────────────────────────
 
     def _poll(self):
         try:
@@ -646,18 +629,11 @@ class App(tk.Tk):
                 msg = self._q.get_nowait()
                 kind = msg["kind"]
                 if kind == "log":
-                    self._log_add(msg["text"], msg.get("tag", ""))
+                    self._log.append(msg["text"], msg.get("tag", ""))
                 elif kind == "status":
                     self._status.set(msg["text"])
                 elif kind == "row":
-                    phi_str = msg["values"][3]
-                    try:
-                        phi_val = float(phi_str)
-                        row_tag = "phi_zero" if phi_val < 1e-9 else "phi_nonzero"
-                    except (ValueError, TypeError):
-                        row_tag = "timeout_row"
-                    self._tree.insert("", tk.END,
-                                      values=msg["values"], tags=(row_tag,))
+                    self._tree.add_row(msg["values"])
                     self._results.append(msg["values"])
                 elif kind == "done":
                     self._on_done(msg)
@@ -668,1627 +644,905 @@ class App(tk.Tk):
     def _post(self, **kw):
         self._q.put(kw)
 
-    def _log_add(self, text: str, tag: str = ""):
-        self._log.configure(state=tk.NORMAL)
-        self._log.insert(tk.END, text + "\n", tag if tag else ())
-        self._log.see(tk.END)
-        self._log.configure(state=tk.DISABLED)
+    def _on_predefinido(self, *_):
+        key = self._pre_var.get()
+        if key in PREDEFINIDOS:
+            p = PREDEFINIDOS[key]
+            self._sys_var.set(p["sistema"])
+            self._est_var.set(p["estado"])
+            self._csv_var.set(p["csv"])
+            self._alc_var.set(p["sistema"])
+            self._mec_var.set(p["sistema"])
 
-    def _log_clear(self):
-        self._log.configure(state=tk.NORMAL)
-        self._log.delete("1.0", tk.END)
-        self._log.configure(state=tk.DISABLED)
+    def _browse(self):
+        path = filedialog.askopenfilename(
+            title="Seleccionar CSV", filetypes=[("CSV", "*.csv"), ("Todos", "*.*")])
+        if path:
+            self._csv_var.set(path)
 
-    def _tab_set(self, widget, content: str):
-        widget.configure(state=tk.NORMAL)
-        widget.delete("1.0", tk.END)
-        widget.insert("1.0", content)
-        widget.configure(state=tk.DISABLED)
-
-    def _analysis_tabs_clear(self):
-        """Limpia solo las 4 pestañas de análisis (preserva Excel)."""
+    def _clear(self):
+        self._log.clear()
+        self._tree.clear()
+        self._results.clear()
         for w in [self._tab_correctitud, self._tab_complejidad,
-                  self._tab_eficiencia,  self._tab_comparacion]:
-            self._tab_set(w, "")
+                  self._tab_eficiencia, self._tab_comparacion]:
+            w.set_content("")
+        for card in [self._card_phi, self._card_time, self._card_part, self._card_n]:
+            card.set("—")
+        self._status.set("Listo")
 
-    def _tabs_clear(self):
-        """Limpia todas las pestañas incluida Excel."""
-        self._analysis_tabs_clear()
-        self._tab_set(self._tab_excel_txt, "")
+    def _limpiar_historial(self):
+        for item in self._hist_tree.get_children():
+            self._hist_tree.delete(item)
+        self._historial_analisis.clear()
 
-    def _actualizar_csv_status(self):
+    def _actualizar_csv_status(self, *_):
         path = self._csv_var.get().strip()
         if not path:
-            self._csv_status_lbl.config(
-                text="", fg=COLORS['text_secondary'])
+            self._csv_status_lbl.configure(text="", fg=PALETTE["subtext"])
             return
-        self._csv_status_lbl.config(
-            text="⏳ Analizando CSV…", fg=COLORS['text_secondary'])
-        threading.Thread(
-            target=self._analizar_csv, args=(path,), daemon=True).start()
+        self._csv_status_lbl.configure(text="⏳ Verificando…", fg=PALETTE["subtext"])
+        threading.Thread(target=self._analizar_csv, args=(path,), daemon=True).start()
 
     def _analizar_csv(self, ruta):
         if not os.path.exists(ruta):
-            self.after(0, lambda: self._csv_status_lbl.config(
+            self.after(0, lambda: self._csv_status_lbl.configure(
                 text="⚠ CSV no encontrado — se usará TPM sintética",
-                fg=COLORS['warning']))
+                fg=PALETTE["yellow"]))
             return
         try:
-            n_vars  = 0
-            n_filas = 0
-            with open(ruta, encoding='utf-8', errors='replace') as f:
+            n_vars = n_filas = 0
+            with open(ruta, encoding="utf-8", errors="replace") as f:
                 for i, line in enumerate(f):
                     line = line.strip()
                     if not line:
                         continue
                     if i == 0:
-                        parts = line.split(',')
+                        parts = line.split(",")
                         n_vars = len(parts)
                         try:
-                            float(parts[0])
-                            n_filas = 1
+                            float(parts[0]); n_filas = 1
                         except ValueError:
                             pass
                     else:
                         n_filas += 1
-            esperado = 2 ** n_vars if n_vars > 0 else 0
+            esperado = 2**n_vars if n_vars > 0 else 0
             ok = (n_filas == esperado) and (esperado > 0)
-            if ok:
-                txt = (f"✓ CSV válido  —  "
-                       f"{n_filas:,} estados × {n_vars} variables")
-                fg  = COLORS['success']
-            else:
-                txt = (f"⚠ CSV cargado  —  {n_filas:,} filas "
-                       f"(esperado {esperado:,})")
-                fg  = COLORS['warning']
-            self.after(0, lambda t=txt, c=fg: self._csv_status_lbl.config(
-                text=t, fg=c))
+            txt = (f"✓ CSV válido — {n_filas:,} estados × {n_vars} variables" if ok
+                   else f"⚠ CSV cargado — {n_filas:,} filas (esperado {esperado:,})")
+            fg = PALETTE["green"] if ok else PALETTE["yellow"]
+            self.after(0, lambda t=txt, c=fg: self._csv_status_lbl.configure(text=t, fg=c))
         except Exception as e:
             msg = f"✗ Error leyendo CSV: {e}"
-            self.after(0, lambda m=msg: self._csv_status_lbl.config(
-                text=m, fg=COLORS['danger']))
+            self.after(0, lambda m=msg: self._csv_status_lbl.configure(
+                text=m, fg=PALETTE["red"]))
 
-    # ── Callbacks de widgets ───────────────────────────────────────────────
-
-    def _on_n(self, value: str):
-        if value not in PREDEFINIDOS:
-            return
-        self._updating_predefined = True
-        cfg = PREDEFINIDOS[value]
-        self._sys_var.set(cfg["sistema"])
-        self._est_var.set(cfg["estado"])
-        self._csv_var.set(cfg["csv"])
-        self._alc_var.set(cfg["sistema"])
-        self._mec_var.set(cfg["sistema"])
-        self._updating_predefined = False
-        self._actualizar_csv_status()
-
-    def _browse(self):
-        p = filedialog.askopenfilename(
-            title="Seleccionar CSV del sistema",
-            filetypes=[("CSV", "*.csv"), ("Todos", "*.*")],
-            initialdir="data"
-        )
-        if p:
-            self._csv_var.set(p)
-
-    def _clear(self):
-        for v in (self._sys_var, self._est_var, self._csv_var,
-                  self._alc_var, self._mec_var):
-            v.set("")
-        self._n_var.set("— seleccionar —")
-        self._use_geo.set(True)
-        self._use_qnod.set(True)
-        self._log_clear()
-        for it in self._tree.get_children():
-            self._tree.delete(it)
-        self._tabs_clear()
-        self._excel_rows.clear()
-        self._prueba_counter = 0
-        self._historial_analisis.clear()
-        self._ultimo_n_sistema = 0
-        self._ultimo_sistema   = ''
-        self._status.set("Listo")
-        self._results.clear()
-        self._actualizar_csv_status()
-
-    def _limpiar_excel_tab(self):
-        self._excel_rows.clear()
-        self._prueba_counter = 0
-        self._tab_set(self._tab_excel_txt, "")
-
-    def _exportar_historial_excel(self):
-        """
-        Exporta TODAS las entradas del historial al Excel en un solo paso.
-        Útil para guardar resultados de una suite completa o varios análisis manuales.
-        """
-        if not self._historial_analisis:
-            messagebox.showwarning(
-                "Historial vacío",
-                "No hay análisis en el historial.\n"
-                "Ejecuta al menos un análisis o una suite primero.")
-            return
-
-        excel_path = filedialog.askopenfilename(
-            title="Selecciona DatosPruebas2026_1.xlsx",
-            filetypes=[("Excel files", "*.xlsx"), ("Todos", "*.*")]
-        )
-        if not excel_path:
-            return
-
-        # Guardar estado actual de _ultimo_* para restaurar después
-        saved_geo      = self._ultimo_res_geo
-        saved_geo_full = self._ultimo_res_geo_full
-        saved_qn       = self._ultimo_res_qn
-        saved_sub      = self._ultimo_sub
-        saved_tgeo     = self._ultimo_t_geo
-        saved_tqn      = self._ultimo_t_qn
-        saved_n        = self._ultimo_n_sistema
-
-        errores = 0
-        for entrada in self._historial_analisis:
-            try:
-                # Establecer _ultimo_* desde la entrada del historial
-                self._ultimo_res_geo      = entrada['res_geo']
-                self._ultimo_res_geo_full = entrada.get('res_geo_full')
-                self._ultimo_res_qn       = entrada['res_qn']
-                self._ultimo_sub          = entrada['sub']
-                self._ultimo_t_geo        = entrada['t_geo']
-                self._ultimo_t_qn         = entrada['t_qn']
-                self._ultimo_n_sistema    = entrada['n_sistema']
-                self._exportar_a_excel_path(
-                    excel_path,
-                    entrada['alcance'],
-                    entrada['mecanismo'],
-                    n_sistema=entrada['n_sistema'],
-                )
-            except Exception:
-                errores += 1
-
-        # Restaurar estado original
-        self._ultimo_res_geo      = saved_geo
-        self._ultimo_res_geo_full = saved_geo_full
-        self._ultimo_res_qn       = saved_qn
-        self._ultimo_sub          = saved_sub
-        self._ultimo_t_geo        = saved_tgeo
-        self._ultimo_t_qn         = saved_tqn
-        self._ultimo_n_sistema    = saved_n
-
-        total = len(self._historial_analisis)
-        messagebox.showinfo(
-            "Historial exportado",
-            f"Exportadas {total - errores}/{total} entradas.\n"
-            + (f"Errores: {errores}" if errores else "Sin errores."))
-
-    # ── Suite de pruebas ───────────────────────────────────────────────────
-
-    def _ejecutar_suite(self):
-        from tkinter import simpledialog
-
-        if not MODULES_OK:
-            messagebox.showerror("Error",
-                                 f"Módulos no disponibles:\n{MODULES_ERROR}")
-            return
-
-        opciones = list(SUITES.keys())
-        eleccion = simpledialog.askstring(
-            "Ejecutar suite",
-            f"Escribe el nombre de la suite:\n{', '.join(opciones)}",
-            initialvalue=opciones[0],
-        )
-        if not eleccion or eleccion not in SUITES:
-            if eleccion:
-                messagebox.showwarning("Suite",
-                                       f"Suite no válida: {eleccion!r}")
-            return
-
-        suite = SUITES[eleccion]
-
-        exportar_auto = messagebox.askyesno(
-            "Exportar automáticamente",
-            "¿Exportar cada resultado al Excel DatosPruebas2026_1.xlsx?\n"
-            "(Seleccionarás el archivo Excel una sola vez)"
-        )
-
-        excel_path = None
-        if exportar_auto:
-            excel_path = filedialog.askopenfilename(
-                title="Selecciona DatosPruebas2026_1.xlsx",
-                filetypes=[("Excel files", "*.xlsx"), ("Todos", "*.*")]
-            )
-            if not excel_path:
-                exportar_auto = False
-
-        self._btn_run.config(state=tk.DISABLED)
-        self._btn_suite.config(state=tk.DISABLED)
-        self._pb.start(10)
-
-        pruebas = suite['pruebas']
-        total   = len(pruebas)
-
-        def _run():
-            self._modo_suite_activo = True
-            for idx, (alcance, mecanismo) in enumerate(pruebas, start=1):
-                alc = alcance.upper()
-                mec = mecanismo.upper()
-
-                # Actualizar campos en el hilo principal (restaurar sistema + prueba)
-                self.after(0, lambda a=alc, m=mec: (
-                    self._sys_var.set(suite['sistema']),
-                    self._est_var.set(suite['estado']),
-                    self._csv_var.set(suite['csv']),
-                    self._alc_var.set(a),
-                    self._mec_var.set(m),
-                ))
-
-                self._post(
-                    kind="status",
-                    text=f"Suite {eleccion}: {idx}/{total}  {alc} × {mec}")
-                self._post(
-                    kind="log",
-                    text=f"\n{'─'*45}\n"
-                         f"  [{idx}/{total}]  alcance={alc}  mec={mec}",
-                    tag="info")
-
-                # Limpiar tabla de resultados para esta prueba
-                def _reset():
-                    for it in self._tree.get_children():
-                        self._tree.delete(it)
-                    self._results.clear()
-                    self._analysis_tabs_clear()
-
-                self.after(0, _reset)
-
-                # Ejecutar análisis bloqueante (retorna un Event)
-                done_ev = self._ejecutar_analisis_sync(
-                    sistema  = suite['sistema'],
-                    estado   = suite['estado'],
-                    csv_path = suite['csv'],
-                    alcance  = alc,
-                    mec      = mec,
-                )
-                done_ev.wait(timeout=700)   # espera UI; max 700 s por prueba
-
-                # Exportar al Excel si corresponde
-                if exportar_auto and excel_path:
-                    self._exportar_a_excel_path(
-                        excel_path, alc, mec,
-                        n_sistema=len(suite['sistema']))
-
-            self._modo_suite_activo = False
-            # Restaurar GUI al terminar
-            self.after(0, lambda: (
-                self._btn_run.config(state=tk.NORMAL),
-                self._btn_suite.config(state=tk.NORMAL),
-                self._pb.stop(),
-                self._status.set(
-                    f"Suite '{eleccion}' completada: {total} pruebas"),
-            ))
-
-        threading.Thread(target=_run, daemon=True).start()
-
-    # ── Ejecución ──────────────────────────────────────────────────────────
+    # ── Ejecución manual ──────────────────────────────────────────────────────
 
     def _run(self):
         if not MODULES_OK:
-            messagebox.showerror("Error",
-                                 f"Módulos no disponibles:\n{MODULES_ERROR}")
-            return
+            messagebox.showerror("Módulos no disponibles", MODULES_ERROR); return
+        self._clear()
+        self._pb.start(12)
+        self._status.set("Ejecutando análisis…")
+        t = threading.Thread(target=self._worker, daemon=True)
+        t.start()
 
+    def _worker(self):
+        import numpy as np
         sistema  = self._sys_var.get().strip().upper()
         estado   = self._est_var.get().strip()
         csv_path = self._csv_var.get().strip()
         alcance  = self._alc_var.get().strip().upper()
         mec      = self._mec_var.get().strip().upper()
+        usar_geo  = self._use_geo.get()
+        usar_qnod = self._use_qnod.get()
 
-        if not all([sistema, estado, alcance, mec]):
-            messagebox.showwarning(
-                "Campos incompletos",
-                "Completa: sistema, estado inicial, alcance y mecanismo.")
-            return
-
-        if len(estado) != len(sistema):
-            messagebox.showwarning(
-                "Error de configuración",
-                f"El estado inicial debe tener {len(sistema)} bits "
-                f"(tiene {len(estado)}).")
-            return
-
-        if not self._use_geo.get() and not self._use_qnod.get():
-            messagebox.showwarning("Sin estrategias",
-                                   "Selecciona al menos una estrategia.")
-            return
-
-        self._log_clear()
-        for it in self._tree.get_children():
-            self._tree.delete(it)
-        self._analysis_tabs_clear()   # preserva la tabla Excel
-        self._results.clear()
-        self._btn_run.config(state=tk.DISABLED)
-        self._btn_suite.config(state=tk.DISABLED)
-        self._pb.start(10)
-        self._status.set("Iniciando…")
-
-        params = dict(sistema=sistema, estado=estado, csv_path=csv_path,
-                      alcance=alcance, mec=mec,
-                      usar_geo=self._use_geo.get(),
-                      usar_qnod=self._use_qnod.get())
-
-        threading.Thread(
-            target=self._worker, kwargs=params, daemon=True).start()
-
-    def _worker(self, sistema, estado, csv_path, alcance, mec,
-                usar_geo, usar_qnod):
-        import numpy as np
-        t0 = time.time()
-        geo_res = qnod_res = None
+        self._ultimo_n_sistema = len(sistema)
+        self._ultimo_sistema   = sistema
+        t0  = time.time()
         sub = None
 
         try:
             if csv_path and os.path.exists(csv_path):
-                self._post(kind="status", text="Cargando CSV…")
-                self._post(kind="log",
-                           text=f"📂 CSV: {csv_path}", tag="info")
+                self._post(kind="log", text=f"📂 CSV: {csv_path}", tag="info")
                 sys_full = System.desde_csv(csv_path, estado)
-
-                # ── Corrección: estado más corto que el CSV ────────────────
-                # Si tpm.shape[0] != 2^n, el estado tenía longitud incorrecta.
-                # Inferir n real desde las columnas del CSV y reconstruir.
-                if sys_full.tpm.shape[0] != 2 ** sys_full.n:
-                    n_csv = sys_full.tpm.shape[1]
-                    if n_csv > 0 and sys_full.tpm.shape[0] == 2 ** n_csv:
-                        estado_csv = (estado + '0' * n_csv)[:n_csv]
+                if sys_full.tpm.shape[0] != 2**sys_full.n:
+                    n_filas, n_vars = sys_full.tpm.shape
+                    if sys_full.n > 20 and n_filas == 2**20:
+                        self._post(kind="log",
+                                   text=f"  ⚠ CSV truncado a 2^20={n_filas:,} filas "
+                                        f"(N={sys_full.n} > 20, límite de memoria)",
+                                   tag="warn")
+                    elif n_vars > 0 and n_filas == 2**n_vars:
+                        estado_csv = (estado + '0'*n_vars)[:n_vars]
                         sys_full = System.desde_csv(csv_path, estado_csv)
                         self._post(kind="log",
-                                   text=f"  ⚠ Estado corregido: "
-                                        f"'{estado}'→'{estado_csv}' "
-                                        f"(CSV requiere n={n_csv})",
+                                   text=f"  ⚠ Estado corregido: '{estado}'→'{estado_csv}'",
                                    tag="warn")
                     else:
-                        raise ValueError(
-                            f"CSV no reconocido: {sys_full.tpm.shape[0]} "
-                            f"filas ≠ 2^{n_csv}={2**n_csv if n_csv>0 else '?'}")
-
+                        raise ValueError(f"CSV no reconocido: {sys_full.tpm.shape}")
                 self._post(kind="status", text="Construyendo subsistema…")
-                self._post(kind="log",
-                           text=f"🔧 Subsistema: alcance={alcance}  mec={mec}",
-                           tag="info")
+                self._post(kind="log", text=f"🔧 Subsistema: alcance={alcance} mec={mec}", tag="info")
                 sub = sys_full.construir_subsistema(list(alcance), list(mec))
-
-                # Consistencia residual de columnas (seguridad extra)
                 if sub.n != sub.tpm.shape[1]:
                     cols_elim = list(range(sub.n, sub.tpm.shape[1]))
                     if cols_elim:
                         sub = sub.marginalizar_columnas(cols_elim)
-                        self._post(kind="log",
-                                   text=f"  ⚠ Columnas residuales corregidas: "
-                                        f"tpm→{sub.tpm.shape}",
-                                   tag="warn")
-
-                # Advertencia si la forma sigue inconsistente (no bloquea)
-                if sub.n > 0 and sub.tpm.shape[0] != 2 ** sub.n:
+                if sub.n > 0 and sub.tpm.shape[0] != 2**sub.n:
                     self._post(kind="log",
-                               text=f"  ⚠ Forma inusual: "
-                                    f"{sub.tpm.shape[0]} filas ≠ 2^{sub.n}",
+                               text=f"  ⚠ Forma inusual: {sub.tpm.shape[0]} filas ≠ 2^{sub.n}",
                                tag="warn")
-
-                # Subsistema vacío = intersección alcance∩mecanismo = ∅
                 if sub.n == 0:
                     self._post(kind="log",
-                               text=f"  ⚠ Alcance y mecanismo no comparten "
-                                    f"variables — φ no definido (= 0).",
-                               tag="warn")
+                               text="  ⚠ Alcance ∩ Mecanismo = ∅ → φ = 0", tag="warn")
             else:
                 n_sub  = min(len(alcance), len(mec))
-                n_rows = 2 ** min(n_sub, 20)
+                n_rows = 2**min(n_sub, 20)
                 seed   = sum(ord(c) for c in estado + alcance + mec) % (2**31)
                 rng    = np.random.default_rng(seed)
                 tpm    = rng.random((n_rows, n_sub))
-                est_s  = (estado + "0" * n_sub)[:n_sub]
+                est_s  = (estado + "0"*n_sub)[:n_sub]
                 sub    = System(tpm, est_s, list(alcance[:n_sub]))
                 self._post(kind="log",
-                           text=f"⚡ CSV no encontrado → subsistema sintético "
-                                f"n={n_sub}, shape={sub.tpm.shape}",
+                           text=f"⚡ CSV no encontrado → subsistema sintético n={n_sub}",
                            tag="warn")
 
             self._post(kind="log",
-                       text=f"  n={sub.n}  |  etiquetas="
-                            f"{''.join(sub.etiquetas)}"
-                            f"  |  tpm={sub.tpm.shape}",
+                       text=f"  n={sub.n}  |  etiquetas={''.join(sub.etiquetas)}  |  tpm={sub.tpm.shape}",
                        tag="info")
-
-            geo_res, qnod_res = self._run_strategies(
-                sub, alcance, mec, usar_geo, usar_qnod)
+            geo_res, qnod_res = self._run_strategies(sub, alcance, mec, usar_geo, usar_qnod)
 
         except Exception as exc:
             import traceback
             self._post(kind="log", text=f"\n❌ ERROR: {exc}", tag="err")
             self._post(kind="log", text=traceback.format_exc(), tag="err")
             self._post(kind="status", text=f"Error: {exc}")
-            self._post(kind="done",
-                       elapsed=time.time() - t0,
-                       geo=None, qnod=None,
-                       sistema=sistema, alcance=alcance, mec=mec,
-                       sub=sub)
+            self._post(kind="done", elapsed=time.time()-t0, geo=None, qnod=None,
+                       sistema=sistema, alcance=alcance, mec=mec, sub=sub)
             return
 
-        self._post(kind="done",
-                   elapsed=time.time() - t0,
+        self._post(kind="done", elapsed=time.time()-t0,
                    geo=geo_res, qnod=qnod_res,
-                   sistema=sistema, alcance=alcance, mec=mec,
-                   sub=sub)
-
-    def _ejecutar_analisis_sync(self, sistema, estado, csv_path, alcance, mec,
-                                usar_geo=True, usar_qnod=True):
-        """
-        Versión bloqueante del análisis para uso en _ejecutar_suite.
-
-        Ejecuta en el hilo actual, posta mensajes log/status al queue,
-        actualiza self._ultimo_* directamente y programa la actualización
-        de UI (análisis + fila Excel) en el hilo principal vía after(0).
-
-        Retorna un threading.Event que se activa cuando la UI ha procesado
-        los resultados, permitiendo al hilo de la suite esperar antes de
-        pasar a la siguiente prueba.
-        """
-        import numpy as np
-        # Guardar N del sistema para que exportar_a_excel lo use correctamente
-        self._ultimo_n_sistema = len(sistema)
-        self._ultimo_sistema   = sistema
-        done_event = threading.Event()
-        t0 = time.time()
-        geo_res = qnod_res = None
-        sub = None
-
-        try:
-            if csv_path and os.path.exists(csv_path):
-                self._post(kind="status", text="Cargando CSV…")
-                self._post(kind="log",
-                           text=f"📂 CSV: {csv_path}", tag="info")
-                sys_full = System.desde_csv(csv_path, estado)
-
-                if sys_full.tpm.shape[0] != 2 ** sys_full.n:
-                    n_csv = sys_full.tpm.shape[1]
-                    if n_csv > 0 and sys_full.tpm.shape[0] == 2 ** n_csv:
-                        estado_csv = (estado + '0' * n_csv)[:n_csv]
-                        sys_full = System.desde_csv(csv_path, estado_csv)
-                        self._post(kind="log",
-                                   text=f"  ⚠ Estado corregido: "
-                                        f"'{estado}'→'{estado_csv}'",
-                                   tag="warn")
-                    else:
-                        raise ValueError(
-                            f"CSV incompatible: {sys_full.tpm.shape}")
-
-                self._post(kind="status", text="Construyendo subsistema…")
-                sub = sys_full.construir_subsistema(list(alcance), list(mec))
-
-                # Consistencia residual de columnas
-                if sub.n != sub.tpm.shape[1]:
-                    cols_elim = list(range(sub.n, sub.tpm.shape[1]))
-                    if cols_elim:
-                        sub = sub.marginalizar_columnas(cols_elim)
-
-                # Advertencia (no bloqueo) si forma inusual persiste
-                if sub.n > 0 and sub.tpm.shape[0] != 2 ** sub.n:
-                    self._post(kind="log",
-                               text=f"  ⚠ Forma inusual: "
-                                    f"{sub.tpm.shape[0]} filas ≠ 2^{sub.n}",
-                               tag="warn")
-
-                # Subsistema vacío = alcance∩mecanismo = ∅
-                if sub.n == 0:
-                    self._post(kind="log",
-                               text=(f"  ⚠ Alcance ∩ Mecanismo = ∅  →  φ = 0 por definición\n"
-                                     f"  (sin variables en común, no hay dependencia causal medible)"),
-                               tag="warn")
-                    res_geo_vacio = {'phi': 0.0, 'biparticion': ([], []),
-                                     'nota': 'interseccion_vacia'}
-                    res_qn_vacio  = {'phi': 0.0, 'k': None, 'biparticion': None,
-                                     'por_k': {}, 'resultados_por_k': {},
-                                     'nota': 'interseccion_vacia'}
-                    self._ultimo_res_geo   = res_geo_vacio
-                    self._ultimo_res_qn    = res_qn_vacio
-                    self._ultimo_sub       = sub
-                    self._ultimo_t_geo     = 0.0
-                    self._ultimo_t_qn      = 0.0
-                    self._ultimo_n_sistema = len(sistema)
-                    _alc  = alcance
-                    _mec  = mec
-                    _n_sis = len(sistema)
-
-                    def _ui_vacio():
-                        self._generar_analisis(res_geo_vacio, res_qn_vacio, sub, 0.0, 0.0)
-                        self._agregar_fila_excel(res_geo_vacio, res_qn_vacio, sub, _alc, _mec)
-                        self._historial_analisis.append({
-                            'alcance':      _alc,
-                            'mecanismo':    _mec,
-                            'n_sistema':    _n_sis,
-                            'res_geo':      res_geo_vacio,
-                            'res_geo_full': None,
-                            'res_qn':       res_qn_vacio,
-                            'sub':          sub,
-                            't_geo':        0.0,
-                            't_qn':         0.0,
-                        })
-                        self._post(kind="log",
-                                   text="\n✅ Completado (φ = 0, intersección vacía)",
-                                   tag="ok")
-                        self._status.set("φ = 0 (intersección vacía)")
-                        done_event.set()
-
-                    self.after(0, _ui_vacio)
-                    return done_event
-            else:
-                n_sub  = min(len(alcance), len(mec))
-                n_rows = 2 ** min(n_sub, 20)
-                seed   = sum(ord(c) for c in estado + alcance + mec) % (2**31)
-                rng    = np.random.default_rng(seed)
-                tpm    = rng.random((n_rows, n_sub))
-                est_s  = (estado + "0" * n_sub)[:n_sub]
-                sub    = System(tpm, est_s, list(alcance[:n_sub]))
-                self._post(kind="log",
-                           text=f"⚡ Subsistema sintético n={n_sub}",
-                           tag="warn")
-
-            self._post(kind="log",
-                       text=f"  n={sub.n}  |  etiquetas="
-                            f"{''.join(sub.etiquetas)}"
-                            f"  |  tpm={sub.tpm.shape}",
-                       tag="info")
-
-            geo_res, qnod_res = self._run_strategies(
-                sub, alcance, mec, usar_geo, usar_qnod)
-
-            # Actualizar _ultimo_* directamente desde el hilo de análisis
-            if geo_res or qnod_res:
-                self._ultimo_res_geo      = geo_res
-                self._ultimo_res_geo_full = geo_res if geo_res else None
-                self._ultimo_res_qn       = qnod_res
-                self._ultimo_sub          = sub
-                self._ultimo_t_geo        = geo_res["tiempo"]  if geo_res  else 0.0
-                self._ultimo_t_qn         = qnod_res["tiempo"] if qnod_res else 0.0
-
-        except Exception as exc:
-            import traceback
-            self._post(kind="log", text=f"\n❌ ERROR: {exc}", tag="err")
-            self._post(kind="log", text=traceback.format_exc(), tag="err")
-            # Registrar en historial con resultado vacío para mantener numeración
-            self._historial_analisis.append({
-                'alcance':      alcance,
-                'mecanismo':    mec,
-                'n_sistema':    self._ultimo_n_sistema,
-                'res_geo':      None,
-                'res_geo_full': None,
-                'res_qn':       None,
-                'sub':          None,
-                't_geo':        0.0,
-                't_qn':         0.0,
-                'error':        str(exc),
-            })
-            done_event.set()
-            return done_event
-
-        elapsed = time.time() - t0
-
-        # Programar actualización de UI en el hilo principal
-        _geo   = geo_res
-        _qnod  = qnod_res
-        _sub   = sub
-        _t_geo = self._ultimo_t_geo
-        _t_qn  = self._ultimo_t_qn
-        _alc   = alcance
-        _mec   = mec
-
-        _n_sis = self._ultimo_n_sistema
-
-        def _ui_update():
-            if _geo or _qnod:
-                self._generar_analisis(_geo, _qnod, _sub, _t_geo, _t_qn)
-                self._agregar_fila_excel(_geo, _qnod, _sub, _alc, _mec)
-                self._historial_analisis.append({
-                    'alcance':      _alc,
-                    'mecanismo':    _mec,
-                    'n_sistema':    _n_sis,
-                    'res_geo':      _geo,
-                    'res_geo_full': _geo,
-                    'res_qn':       _qnod,
-                    'sub':          _sub,
-                    't_geo':        _t_geo,
-                    't_qn':         _t_qn,
-                })
-            self._post(kind="log",
-                       text=f"\n✅ Completado en {elapsed:.2f}s", tag="ok")
-            self._status.set(f"Completado en {elapsed:.2f}s")
-            done_event.set()
-
-        self.after(0, _ui_update)
-        return done_event
+                   sistema=sistema, alcance=alcance, mec=mec, sub=sub)
 
     def _run_strategies(self, sub, alcance, mec, usar_geo, usar_qnod):
-        n    = sub.n
-        etqs = sub.etiquetas
-
-        def label(idx_list):
-            return "".join(etqs[i] for i in idx_list) if idx_list else "∅"
-
-        def _con_timeout(fn, timeout_s=600):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                fut = ex.submit(fn)
-                try:
-                    return fut.result(timeout=timeout_s)
-                except concurrent.futures.TimeoutError:
-                    return None
-
         geo_res = qnod_res = None
+        k = int(self._k_var.get())
+        TIMEOUT = 180
 
-        # ── KGeoMIP k=2,3,4,5 (Branch and Bound) ────────────────────────
-        if usar_geo:
-            self._post(kind="status",
-                       text=f"Ejecutando KGeoMIP k=2,3,4,5 (n={n})…")
-            self._post(kind="log",
-                       text=f"\n▶ KGeoMIP k=2,3,4,5  (n={n})", tag="ok")
-            t0 = time.time()
+        if usar_geo and MODULES_OK:
+            self._post(kind="status", text="KGeoMIP ejecutando…")
+            self._post(kind="log", text="\n─── KGeoMIP ───", tag="head")
+            t0_g = time.time()
             try:
-                k_vals   = [2, 3, 4, 5] if n <= 20 else [2]
-                res_full  = _con_timeout(
-                    lambda: KGeoMIPKPartition(
-                        sub, k_values=k_vals).aplicar_estrategia(),
-                    timeout_s=600
-                )
-                elapsed   = time.time() - t0
-                if res_full is None:
-                    raise RuntimeError("KGeoMIP excedió límite de 600s")
-                res_por_k = res_full.get('resultados_por_k', {})
-
-                # Normalizar phi / n para cada k
-                resultados_norm = {}
-                for k_val, rk in res_por_k.items():
-                    if rk and rk.get('biparticion') is not None:
-                        phi_raw_k = rk.get('phi', float('inf'))
-                        resultados_norm[k_val] = {
-                            'phi':         phi_raw_k / n if n > 0 else 0.0,
-                            'phi_raw':     phi_raw_k,
-                            'biparticion': rk.get('biparticion'),
-                            'tiempo':      rk.get('tiempo', elapsed),
-                        }
-
-                # k=2 para compatibilidad con el resto de la interfaz
-                rk2      = resultados_norm.get(2, {})
-                phi2     = rk2.get('phi', float('inf'))
-                phi_raw2 = rk2.get('phi_raw', phi2)
-                bip2     = rk2.get('biparticion') or [[], []]
-                p1       = bip2[0] if len(bip2) > 0 else []
-                p2       = bip2[1] if len(bip2) > 1 else []
-                part     = f"[{label(p1)}] | [{label(p2)}]"
-
-                self._post(kind="log",
-                           text=f"  k=2: φ = {phi2:.6f}  (raw={phi_raw2:.4f})"
-                                f"  t = {elapsed:.3f}s", tag="ok")
-                self._post(kind="log", text=f"  Partición: {part}")
-                self._post(kind="row",
-                           values=("KGeoMIP", "2", part,
-                                   f"{phi2:.6f}", f"{elapsed:.3f}"))
-
-                for k_val in [3, 4, 5]:
-                    rk = resultados_norm.get(k_val)
-                    if not rk or rk.get('biparticion') is None:
-                        continue
-                    phi_k  = rk['phi']
-                    parts  = rk['biparticion']
-                    part_k = " | ".join(
-                        "{" + label(p) + "}" for p in parts)
-                    self._post(kind="row",
-                               values=("KGeoMIP", f"{k_val}", part_k,
-                                       f"{phi_k:.6f}", f"{elapsed:.3f}"))
-
-                geo_res = {
-                    "phi":              phi2,
-                    "phi_raw":          phi_raw2,
-                    "p1":               p1,
-                    "p2":               p2,
-                    "part":             part,
-                    "biparticion":      [p1, p2],
-                    "tiempo":           elapsed,
-                    "resultados_por_k": resultados_norm,
-                }
-            except Exception as e:
-                self._post(kind="log", text=f"  ❌ Error: {e}", tag="err")
-
-        # ── KQNodes ──────────────────────────────────────────────────────
-        if usar_qnod:
-            self._post(kind="status",
-                       text=f"Ejecutando KQNodes (n={n})…")
-            self._post(kind="log",
-                       text=f"\n▶ KQNodes k=3,4,5  (n={n})", tag="ok")
-            t0 = time.time()
-            try:
-                res = _con_timeout(
-                    lambda: KQNodes(sub).aplicar_estrategia(),
-                    timeout_s=600
-                )
-                elapsed = time.time() - t0
-                if res is None:
-                    raise RuntimeError("KQNodes excedió límite de 600s")
-                phi     = res.get("phi", float("inf"))
-                k_opt   = res.get("k", "?")
-                mejor   = res.get("biparticion") or []
-
-                if mejor:
-                    part_q = " | ".join(
-                        "{" + label(p) + "}" for p in mejor)
+                if k == 2:
+                    geo = KGeoMIP(sub)
                 else:
-                    part_q = "sin partición válida"
-
-                self._post(kind="log",
-                           text=f"  φ_opt = {phi:.6f}  k={k_opt}"
-                                f"  t = {elapsed:.3f}s", tag="ok")
-                self._post(kind="log", text=f"  Partición: {part_q}")
-
-                for k_val, rk in sorted(
-                        res.get("resultados_por_k", {}).items()):
-                    if rk.get("biparticion") is None:
-                        continue
-                    phi_k  = rk["phi"]
-                    part_k = " | ".join(
-                        "{" + label(p) + "}" for p in rk["biparticion"])
-                    self._post(kind="row",
-                               values=("KQNodes", f"{k_val}",
-                                       part_k, f"{phi_k:.6f}",
-                                       f"{elapsed:.3f}"))
-
-                qnod_res = {"phi": phi, "k": k_opt,
-                            "mejor": mejor, "part": part_q,
-                            "biparticion": mejor,
-                            "tiempo": elapsed,
-                            "por_k": res.get("resultados_por_k", {})}
+                    geo = KGeoMIPKPartition(sub, k=k)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                    fut = ex.submit(geo.ejecutar)
+                    try:
+                        geo_res = fut.result(timeout=TIMEOUT)
+                    except concurrent.futures.TimeoutError:
+                        self._post(kind="log",
+                                   text=f"  ⏱ KGeoMIP timeout ({TIMEOUT}s)", tag="warn")
+                        geo_res = None
+                t_g = time.time() - t0_g
+                if geo_res:
+                    geo_res["tiempo"] = t_g
+                    p1, p2 = geo_res["biparticion"]
+                    etqs = sub.etiquetas
+                    s1 = "".join(etqs[i] for i in p1 if i < len(etqs))
+                    s2 = "".join(etqs[i] for i in p2 if i < len(etqs))
+                    phi = geo_res.get("phi", float("inf"))
+                    self._post(kind="log", text=f"  φ = {phi:.8f}", tag="ok")
+                    self._post(kind="log", text=f"  Bipartición: {{{s1}}} | {{{s2}}}", tag="ok")
+                    self._post(kind="log", text=f"  Tiempo: {t_g:.3f}s", tag="info")
+                    self._post(kind="row", values=("KGeoMIP", k, f"{{{s1}}}|{{{s2}}}",
+                                                   f"{phi:.8f}", f"{t_g:.3f}"))
+                    self._ultimo_res_geo   = geo_res
+                    self._ultimo_res_geo_full = geo_res
+                    self._ultimo_t_geo     = t_g
             except Exception as e:
-                self._post(kind="log", text=f"  ❌ Error: {e}", tag="err")
+                self._post(kind="log", text=f"  ✗ KGeoMIP error: {e}", tag="err")
+
+        if usar_qnod and MODULES_OK:
+            self._post(kind="status", text="KQNodes ejecutando…")
+            self._post(kind="log", text="\n─── KQNodes ───", tag="head")
+            t0_q = time.time()
+            try:
+                qn = KQNodes(sub)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                    fut = ex.submit(qn.aplicar_estrategia)
+                    try:
+                        qnod_res = fut.result(timeout=TIMEOUT)
+                    except concurrent.futures.TimeoutError:
+                        self._post(kind="log",
+                                   text=f"  ⏱ KQNodes timeout ({TIMEOUT}s)", tag="warn")
+                        qnod_res = None
+                t_q = time.time() - t0_q
+                if qnod_res:
+                    qnod_res["tiempo"] = t_q
+                    etqs = sub.etiquetas
+                    por_k = qnod_res.get("resultados_por_k", {})
+                    for k_val in sorted(por_k.keys()):
+                        rk = por_k[k_val]
+                        if rk and rk.get("biparticion") is not None:
+                            phi_k = rk.get("phi", float("inf"))
+                            if phi_k < float("inf"):
+                                parts = rk["biparticion"]
+                                part_str = " | ".join(
+                                    "{"+"".join(etqs[v] for v in p if v < len(etqs))+"}"
+                                    for p in parts)
+                                self._post(kind="log",
+                                           text=f"  k={k_val}: φ={phi_k:.8f}  {part_str}",
+                                           tag="ok")
+                                self._post(kind="row",
+                                           values=(f"KQNodes k={k_val}", k_val, part_str,
+                                                   f"{phi_k:.8f}", f"{t_q:.3f}"))
+                    self._ultimo_res_qn = qnod_res
+                    self._ultimo_t_qn   = t_q
+            except Exception as e:
+                self._post(kind="log", text=f"  ✗ KQNodes error: {e}", tag="err")
 
         return geo_res, qnod_res
 
-    # ── Fin de ejecución ───────────────────────────────────────────────────
-
     def _on_done(self, msg):
         self._pb.stop()
-        self._btn_run.config(state=tk.NORMAL)
-        self._btn_suite.config(state=tk.NORMAL)
         elapsed = msg.get("elapsed", 0)
+        geo   = msg.get("geo")
+        qnod  = msg.get("qnod")
+        sub   = msg.get("sub")
+        alc   = msg.get("alcance", "")
+        mec   = msg.get("mec", "")
+        n_sis = len(msg.get("sistema", ""))
+
         self._status.set(f"Completado en {elapsed:.2f}s")
-        self._post(kind="log",
-                   text=f"\n✅ Análisis completado en {elapsed:.2f}s",
-                   tag="ok")
+        self._post(kind="log", text=f"\n✅ Total: {elapsed:.2f}s", tag="ok")
 
-        geo  = msg.get("geo")
-        qnod = msg.get("qnod")
+        if geo:
+            phi = geo.get("phi", float("inf"))
+            self._card_phi.set(f"{phi:.6f}",
+                               PALETTE["green"] if phi < 1e-9 else PALETTE["yellow"])
+        if elapsed > 0:
+            self._card_time.set(f"{elapsed:.3f}s")
+        if geo and sub:
+            etqs = sub.etiquetas
+            p1, p2 = geo.get("biparticion", ([], []))
+            s1 = "".join(etqs[i] for i in p1 if i < len(etqs))
+            s2 = "".join(etqs[i] for i in p2 if i < len(etqs))
+            self._card_part.set(f"{{{s1}}}|{{{s2}}}")
+        if sub:
+            self._card_n.set(str(sub.n))
+
         if geo or qnod:
-            sub   = msg.get("sub")
-            t_geo = geo["tiempo"]  if geo  else 0.0
-            t_qn  = qnod["tiempo"] if qnod else 0.0
-            # Guardar referencias para exportar_a_excel
-            self._ultimo_res_geo      = geo
-            self._ultimo_res_geo_full = geo
-            self._ultimo_res_qn       = qnod
-            self._ultimo_sub          = sub
-            self._ultimo_t_geo        = t_geo
-            self._ultimo_t_qn         = t_qn
-            # Capturar n_sistema desde el campo UI (modo manual)
-            self._ultimo_n_sistema = len(self._sys_var.get().strip())
-            self._ultimo_sistema   = self._sys_var.get().strip()
-            alc = msg.get("alcance", "")
-            mec = msg.get("mec",     "")
-            self._generar_analisis(geo, qnod, sub, t_geo, t_qn)
-            self._agregar_fila_excel(geo, qnod, sub, alcance=alc, mec=mec)
+            self._ultimo_sub = sub
+            self._generar_analisis(geo, qnod, sub,
+                                   geo.get("tiempo", 0) if geo else 0,
+                                   qnod.get("tiempo", 0) if qnod else 0)
             self._historial_analisis.append({
-                'alcance':      alc,
-                'mecanismo':    mec,
-                'n_sistema':    self._ultimo_n_sistema,
-                'res_geo':      geo,
-                'res_geo_full': geo,
-                'res_qn':       qnod,
-                'sub':          sub,
-                't_geo':        t_geo,
-                't_qn':         t_qn,
+                "alcance": alc, "mecanismo": mec, "n_sistema": n_sis,
+                "res_geo": geo, "res_geo_full": geo,
+                "res_qn": qnod, "sub": sub,
+                "t_geo": geo.get("tiempo", 0) if geo else 0,
+                "t_qn": qnod.get("tiempo", 0) if qnod else 0,
             })
+            self._actualizar_historial_tree()
 
-    # ── Generación de análisis → 4 pestañas ───────────────────────────────
-
-    def _generar_analisis(self, res_geo, res_qn, sub, t_geo, t_qn):
-        if sub is None:
-            n, etqs = 0, []
-        else:
-            n, etqs = sub.n, sub.etiquetas
-
-        sep = "─" * 55
-
-        # ── PESTAÑA 1: CORRECTITUD ────────────────────────────────────────
-        L1 = []
-        L1.append("■ CORRECTITUD")
-        L1.append(sep)
-        L1.append("Principio: una k-partición es CORRECTA si y solo si")
-        L1.append("reconstituye la distribución original con φ mínimo.")
-        L1.append("  φ = EMD(dist_orig, dist_particionada) / n  ∈ [0, 1]")
-        L1.append("")
-
-        if res_geo:
-            phi_g = res_geo["phi"]
-            p1, p2 = res_geo["biparticion"]
-            part_g = (f"[{''.join(etqs[i] for i in p1)}]"
-                      f" | [{''.join(etqs[i] for i in p2)}]")
-            if phi_g < 1e-9:
-                L1.append("  KGeoMIP: φ = 0  ✓  Partición perfecta.")
-                L1.append(
-                    f"  Las partes {part_g} son causalmente independientes.")
-                L1.append(
-                    "  La distribución reconstruida ES idéntica a la original.")
-            else:
-                L1.append(f"  KGeoMIP: φ = {phi_g:.6f}")
-                L1.append(f"  Partición {part_g} introduce pérdida.")
-                L1.append(
-                    "  Interpretación: existe dependencia causal entre las")
-                L1.append("  partes que no puede eliminarse con k=2.")
-                L1.append(
-                    f"  La distribución reconstruida difiere en {phi_g:.4f}"
-                    " unidades de la original (escala Hamming normalizada).")
-
-        L1.append("")
-        if res_qn and res_qn.get("phi", float("inf")) < float("inf"):
-            phi_q = res_qn["phi"]
-            k_opt = res_qn.get("k", "?")
-            if phi_q < 1e-9:
-                L1.append(f"  KQNodes: φ = 0  ✓  k={k_opt}-partición perfecta.")
-                L1.append(
-                    f"  El sistema se descompone completamente en {k_opt}"
-                    " partes independientes sin pérdida de información.")
-            else:
-                L1.append(f"  KQNodes: φ = {phi_q:.6f}  k={k_opt}")
-                L1.append(f"  Pérdida mínima hallada con {k_opt} partes.")
-        elif res_qn:
-            if n < 3:
-                L1.append(f"  KQNodes: no ejecutado — n={n} < 3 variables.")
-                L1.append(
-                    "  (se necesitan al menos 3 variables para k=3,4,5)")
-            else:
-                L1.append("  KQNodes: sin resultado válido (posible timeout)")
-
-        self._tab_set(self._tab_correctitud, "\n".join(L1))
-
-        # ── PESTAÑA 2: COMPLEJIDAD ────────────────────────────────────────
-        L2 = []
-        L2.append("■ COMPLEJIDAD ASINTÓTICA  (n_sub = %d)" % n)
-        L2.append(sep)
-
-        if n > 0:
-            num_estados = 2 ** n
-            bip_total   = 2 ** (n - 1) - 1
-
-            L2.append("  KGeoMIP:")
-            L2.append("  ├─ Tabla T (BFS sparse):")
-            L2.append(
-                f"  │    T(n) = n · 2^n = {n} · {num_estados}"
-                f" = {n * num_estados:,} ops")
-            L2.append("  │    Clase: O(n · 2^n)  —  exponencial en n")
-            L2.append("  ├─ Biparticiones candidatas:")
-            L2.append(
-                f"  │    2^(n-1) - 1 = {bip_total:,} biparticiones posibles")
-            L2.append(
-                f"  │    Evaluadas: "
-                f"{'exhaustivo' if n <= 15 else 'heurístico (n>15)'}")
-            L2.append("  └─ Total: O(n · 2^n)")
-            L2.append("")
-
-            L2.append("  KQNodes:")
-            for k in [3, 4, 5]:
-                if k > n:
-                    continue
-                s = stirling2(n, k)
-                L2.append(f"  ├─ k={k}: S({n},{k}) = {s:,} particiones")
-                L2.append(
-                    f"  │    Costo por partición: O(k · 2^n)"
-                    f" = O({k}·{num_estados:,})")
-                L2.append(
-                    f"  │    Total k={k}: {s * k * num_estados:,} ops"
-                    f" ~ O(S(n,{k})·n·2^n)")
-            L2.append("  └─ Con memoización: reduce a O(2^n) cálculos únicos")
-            L2.append("")
-            L2.append("  Comparación de orden:")
-            L2.append(
-                f"  KGeoMIP     O(n·2^n)          ="
-                f" {n * num_estados:>12,}")
-            if n >= 3:
-                s3 = stirling2(n, 3)
-                L2.append(
-                    f"  KQNodes k=3 O(S(n,3)·n·2^n) ="
-                    f" {s3 * n * num_estados:>12,}")
-        else:
-            L2.append("  (sin datos de subsistema)")
-
-        self._tab_set(self._tab_complejidad, "\n".join(L2))
-
-        # ── PESTAÑA 3: EFICIENCIA ─────────────────────────────────────────
-        L3 = []
-        L3.append("■ EFICIENCIA")
-        L3.append(sep)
-
-        if res_geo and t_geo > 0:
-            phi_g = res_geo["phi"]
-            L3.append(f"  KGeoMIP:  t = {t_geo:.4f}s")
-            if phi_g > 1e-9:
-                L3.append(
-                    f"  ├─ Rendimiento: {t_geo / phi_g:.2f} s por unidad-φ")
-                L3.append(
-                    f"  └─ Para φ=0 necesitaría ≈{t_geo * phi_g:.4f}s adicionales")
-            else:
-                L3.append(f"  └─ Óptimo: φ=0 alcanzado en {t_geo:.4f}s")
-
-        if (res_qn and res_qn.get("phi", float("inf")) < float("inf")
-                and t_qn > 0):
-            phi_q = res_qn["phi"]
-            L3.append(f"  KQNodes:  t = {t_qn:.4f}s")
-            if phi_q > 1e-9:
-                L3.append(
-                    f"  ├─ Rendimiento: {t_qn / phi_q:.2f} s por unidad-φ")
-            else:
-                L3.append(
-                    f"  └─ Óptimo: φ=0 alcanzado en {t_qn:.4f}s")
-
-        if not res_geo and not res_qn:
-            L3.append("  Sin datos para calcular eficiencia.")
-
-        self._tab_set(self._tab_eficiencia, "\n".join(L3))
-
-        # ── PESTAÑA 4: COMPARACIÓN ────────────────────────────────────────
-        L4 = []
-        L4.append("■ COMPARACIÓN ENTRE ESTRATEGIAS")
-        L4.append(sep)
-
-        phi_g = res_geo["phi"] if res_geo else float("inf")
-        phi_q = (res_qn["phi"]
-                 if (res_qn and
-                     res_qn.get("phi", float("inf")) < float("inf"))
-                 else float("inf"))
-
-        if phi_g < float("inf") and phi_q < float("inf"):
-            ganador = "KGeoMIP" if phi_g <= phi_q else "KQNodes"
-            dif_phi = abs(phi_g - phi_q)
-            dif_t   = abs(t_geo - t_qn)
-            mas_rap = "KGeoMIP" if t_geo < t_qn else "KQNodes"
-
-            L4.append(f"  Pérdida mínima: {ganador}")
-            L4.append(f"  ├─ KGeoMIP φ = {phi_g:.6f}  (k=2)")
-            L4.append(
-                f"  ├─ KQNodes φ = {phi_q:.6f}  (k={res_qn.get('k','?')})")
-            L4.append(f"  └─ Diferencia: Δφ = {dif_phi:.6f}")
-            L4.append("")
-            L4.append(f"  Velocidad: {mas_rap} más rápido por {dif_t:.4f}s")
-            L4.append("")
-
-            if res_geo and res_qn and res_qn.get("biparticion"):
-                vars_g  = set(etqs[i] for i in res_geo["biparticion"][0])
-                vars_q1 = set(etqs[v] for v in res_qn["biparticion"][0])
-                if vars_g == vars_q1:
-                    L4.append(
-                        "  Concordancia: ambas estrategias identificaron")
-                    L4.append(
-                        "  el mismo subconjunto de variables como primera parte.")
-                else:
-                    L4.append(
-                        "  Divergencia: cada estrategia encontró una")
-                    L4.append(
-                        "  estructura de partición diferente.")
-                L4.append("")
-
-            L4.append("  Recomendación:")
-            if phi_g <= phi_q:
-                L4.append("  → Usar KGeoMIP: menor pérdida con k=2.")
-                L4.append(
-                    "    Si φ>0, el sistema tiene dependencia causal")
-                L4.append(
-                    "    irreducible que ninguna bipartición elimina.")
-            else:
-                L4.append("  → Usar KQNodes: menor pérdida con k>2.")
-                L4.append(
-                    "    El sistema requiere más de 2 partes para")
-                L4.append(
-                    "    capturar su estructura causal real.")
-
-        elif phi_g < float("inf") and phi_q == float("inf"):
-            # KQNodes no completó — mostrar causa y recomendación
-            L4.append("  KQNodes no completó en este subsistema.")
-            L4.append("  Posibles causas:")
-            L4.append(f"  ├─ Subsistema con n={n} variables y k=3,4,5")
-            L4.append(f"  │   requiere S(n,3)+S(n,4)+S(n,5) evaluaciones")
-            if n >= 3:
-                total = sum(stirling2(n, k) for k in [3, 4, 5] if k <= n)
-                L4.append(f"  │   Total: {total:,} particiones a evaluar")
-            L4.append("  ├─ Timeout de 600s aplicado automáticamente")
-            L4.append("  └─ Recomendación: reducir el subsistema a n≤8")
-            L4.append("     para obtener comparación completa.")
-            L4.append("")
-            L4.append(f"  KGeoMIP disponible: φ = {phi_g:.6f}  (k=2)")
-
-        elif phi_g < float("inf"):
-            L4.append("  Solo KGeoMIP disponible para comparación.")
-            L4.append(f"  KGeoMIP: φ = {phi_g:.6f}  (k=2)")
-        else:
-            L4.append("  Sin resultados suficientes para comparar.")
-
-        self._tab_set(self._tab_comparacion, "\n".join(L4))
-
-    # ── Pestaña 5: Datos Excel ────────────────────────────────────────────
-
-    def _agregar_fila_excel(self, geo, qnod, sub, alcance, mec):
-        """Añade una fila a self._excel_rows y refresca la pestaña."""
-        self._prueba_counter += 1
-        etqs = sub.etiquetas if sub else []
+    def _generar_analisis(self, geo_res, qnod_res, sub, t_geo, t_qn):
+        if not sub:
+            return
+        n    = sub.n
+        etqs = sub.etiquetas
 
         def lbl(idxs):
-            if not idxs or not etqs:
-                return '—'
-            return "".join(etqs[i] for i in idxs if i < len(etqs))
+            return "".join(etqs[i] for i in idxs if i < len(etqs)) if etqs else ""
 
-        # KGeoMIP k=2
-        if geo:
-            p1, p2 = geo['biparticion']
-            geo_d = {
-                'part': f"[{lbl(p1)}]|[{lbl(p2)}]",
-                'phi':  f"{geo['phi']:.6f}",
-                't':    f"{geo['tiempo']:.3f}",
-            }
-        else:
-            geo_d = {'part': '—', 'phi': '—', 't': '—'}
+        lines_c, lines_x, lines_e, lines_cmp = [], [], [], []
 
-        # KQNodes por k
-        por_k   = qnod.get('por_k', {}) if qnod else {}
-        t_qn    = qnod.get('tiempo', 0)  if qnod else 0
-        qn_d    = {}
-        for k in [3, 4, 5]:
-            rk = por_k.get(k, {})
-            if (rk and rk.get('biparticion') is not None
-                    and rk.get('phi', float('inf')) < float('inf')):
-                parts_str = " | ".join(
-                    "{" + lbl(p) + "}" for p in rk['biparticion'])
-                qn_d[k] = {
-                    'part': parts_str,
-                    'phi':  f"{rk['phi']:.6f}",
-                    't':    f"{t_qn:.3f}",
-                }
-            else:
-                qn_d[k] = {'part': '—', 'phi': '—', 't': '—'}
+        # ── Correctitud ──────────────────────────────────────────────────────
+        lines_c.append("═"*55)
+        lines_c.append("  CORRECTITUD  —  §5.2.1")
+        lines_c.append("═"*55)
+        if geo_res:
+            phi  = geo_res.get("phi", float("inf"))
+            p1, p2 = geo_res.get("biparticion", ([], []))
+            lines_c.append(f"  KGeoMIP (k=2)")
+            lines_c.append(f"    φ (MIP)      = {phi:.8f}")
+            lines_c.append(f"    Bipartición  = {{{lbl(p1)}}} | {{{lbl(p2)}}}")
+            lines_c.append(f"    Resultado    : {'φ=0 → sistema causalmente independiente' if phi < 1e-9 else 'φ>0 → causalidad integrada detectada'}")
+        if qnod_res:
+            por_k = qnod_res.get("resultados_por_k", {})
+            for k_val in sorted(por_k.keys()):
+                rk = por_k[k_val]
+                if rk and rk.get("phi", float("inf")) < float("inf"):
+                    phi_k = rk["phi"]
+                    parts = rk.get("biparticion", [])
+                    pstr  = " | ".join(f"{{{lbl(p)}}}" for p in parts)
+                    lines_c.append(f"  KQNodes k={k_val}")
+                    lines_c.append(f"    φ (MIP)      = {phi_k:.8f}")
+                    lines_c.append(f"    Partición    = {pstr}")
 
-        # Geometric k=3,4,5
-        res_geo_full = getattr(self, '_ultimo_res_geo_full', None)
-        por_k_geo    = res_geo_full.get('resultados_por_k', {}) if res_geo_full else {}
-        geo_kn_d     = {}
-        for k in [3, 4, 5]:
-            rk = por_k_geo.get(k, {})
-            if (rk and rk.get('biparticion') is not None
-                    and rk.get('phi', float('inf')) < float('inf')):
-                parts_str = " | ".join(
-                    "{" + lbl(p) + "}" for p in rk['biparticion'])
-                geo_kn_d[k] = {
-                    'part': parts_str,
-                    'phi':  f"{rk['phi']:.6f}",
-                    't':    f"{rk.get('tiempo', 0):.3f}",
-                }
-            else:
-                geo_kn_d[k] = {'part': '—', 'phi': '—', 't': '—'}
+        # ── Complejidad ───────────────────────────────────────────────────────
+        lines_x.append("═"*55)
+        lines_x.append("  COMPLEJIDAD  —  §5.2.3")
+        lines_x.append("═"*55)
+        lines_x.append(f"  n (subsistema)       = {n}")
+        lines_x.append(f"  Estados              = 2^{n} = {2**n if n <= 20 else '> 1M'}")
+        k_geo = 2
+        lines_x.append(f"  KGeoMIP k=2  BFS     = O(n · 2^n)")
+        for k_val in [2, 3, 4, 5]:
+            try:
+                s = stirling2(n, k_val)
+                lines_x.append(f"  S({n},{k_val}) biparticiones   = {s:,}")
+            except Exception:
+                pass
 
-        self._excel_rows.append({
-            'prueba':  self._prueba_counter,
-            'alcance': alcance,
-            'mec':     mec,
-            'geo':     geo_d,
-            'qn':      qn_d,
-            'geo_kn':  geo_kn_d,
-        })
-        self._actualizar_tab_excel()
+        # ── Eficiencia ────────────────────────────────────────────────────────
+        lines_e.append("═"*55)
+        lines_e.append("  EFICIENCIA  —  §5.2.4")
+        lines_e.append("═"*55)
+        if t_geo > 0:
+            lines_e.append(f"  KGeoMIP tiempo       = {t_geo:.4f}s")
+        if t_qn > 0:
+            lines_e.append(f"  KQNodes tiempo       = {t_qn:.4f}s")
+        if t_geo > 0 and t_qn > 0 and t_qn > 0:
+            ratio = t_qn / t_geo if t_geo > 0 else 0
+            lines_e.append(f"  Speedup GEO/QN       = {ratio:.2f}x")
 
-    def _actualizar_tab_excel(self):
-        """
-        Muestra preview en formato k | Estrategia | Partición | Pérdida | Tiempo.
-        Una fila por combinación (KGeoMIP k=2, KQNodes k=3,4,5).
-        Muestra el análisis más reciente + historial acumulado al final.
-        """
-        lines = []
-        sep = "─" * 72
+        # ── Comparación ───────────────────────────────────────────────────────
+        lines_cmp.append("═"*55)
+        lines_cmp.append("  COMPARACIÓN  KGeoMIP vs KQNodes")
+        lines_cmp.append("═"*55)
+        phi_g = geo_res.get("phi", float("inf"))  if geo_res  else None
+        phi_q = None
+        if qnod_res:
+            por_k = qnod_res.get("resultados_por_k", {})
+            rk2 = por_k.get(2)
+            if rk2:
+                phi_q = rk2.get("phi", float("inf"))
+        if phi_g is not None:
+            lines_cmp.append(f"  φ KGeoMIP = {phi_g:.8f}")
+        if phi_q is not None:
+            lines_cmp.append(f"  φ QNodes  = {phi_q:.8f}")
+        if phi_g is not None and phi_q is not None:
+            diff = abs(phi_g - phi_q)
+            lines_cmp.append(f"  Diferencia = {diff:.2e}")
+            lines_cmp.append(f"  {'OK: resultados equivalentes' if diff < 1e-4 else 'DIFERENCIA significativa'}")
 
-        # ── Cabecera de columnas ──────────────────────────────────────────
-        lines.append(
-            f"{'k':>2}  {'Estrategia':<12}  "
-            f"{'Partición':<28}  {'Pérdida (φ)':>12}  {'Tiempo (s)':>10}")
-        lines.append(sep)
+        self._tab_correctitud.set_content("\n".join(lines_c))
+        self._tab_complejidad.set_content("\n".join(lines_x))
+        self._tab_eficiencia.set_content("\n".join(lines_e))
+        self._tab_comparacion.set_content("\n".join(lines_cmp))
 
-        if not self._excel_rows:
-            lines.append(
-                "  (sin datos — ejecuta un análisis para agregar filas)")
-            self._tab_set(self._tab_excel_txt, "\n".join(lines))
+    # ── Suite ─────────────────────────────────────────────────────────────────
+
+    def _ejecutar_suite(self):
+        if not MODULES_OK:
+            messagebox.showerror("Módulos no disponibles", MODULES_ERROR); return
+        if self._suite_running:
+            messagebox.showinfo("Suite activa", "Una suite ya está en ejecución."); return
+
+        # Determinar suite desde pestaña activa o combo
+        key = self._suite_var.get()
+        if key not in SUITES:
+            key = self._pre_var.get()
+        if key not in SUITES:
+            messagebox.showwarning("Sin suite", f"No hay suite definida para {key}"); return
+
+        suite = SUITES[key]
+        self._suite_running   = True
+        self._modo_suite_activo = True
+        for item in self._suite_tree.get_children():
+            self._suite_tree.delete(item)
+        self._nb.select(1)  # Suites tab
+
+        threading.Thread(
+            target=self._suite_worker,
+            args=(suite, key),
+            daemon=True
+        ).start()
+
+    def _suite_worker(self, suite, key):
+        import numpy as np
+        pruebas = suite["pruebas"]
+        sistema = suite["sistema"]
+        estado  = suite["estado"]
+        csv_p   = suite["csv"]
+        total   = len(pruebas)
+
+        self.after(0, lambda: self._suite_pb.configure(maximum=total, value=0))
+        resultados_csv = []
+
+        for i, (alcance, mec) in enumerate(pruebas, 1):
+            self.after(0, lambda i=i, t=total: (
+                self._suite_pb.configure(value=i),
+                self._suite_lbl.set(f"{i}/{t}")
+            ))
+            self._post(kind="status", text=f"Suite {key}: {i}/{total} — alc={alcance} mec={mec}")
+            self._post(kind="log",
+                       text=f"\n[{i:02d}/{total}] {alcance} / {mec}", tag="head")
+
+            t0   = time.time()
+            sub  = None
+            geo_res = qnod_res = None
+
+            try:
+                if csv_p and os.path.exists(csv_p):
+                    sys_full = System.desde_csv(csv_p, estado)
+                    sub = sys_full.construir_subsistema(list(alcance), list(mec))
+                    if sub.n != sub.tpm.shape[1]:
+                        cols_elim = list(range(sub.n, sub.tpm.shape[1]))
+                        if cols_elim:
+                            sub = sub.marginalizar_columnas(cols_elim)
+                else:
+                    n_sub  = min(len(alcance), len(mec))
+                    n_rows = 2**min(n_sub, 20)
+                    seed   = sum(ord(c) for c in estado + alcance + mec) % (2**31)
+                    rng    = np.random.default_rng(seed)
+                    tpm    = rng.random((n_rows, n_sub))
+                    est_s  = (estado + "0"*n_sub)[:n_sub]
+                    sub    = System(tpm, est_s, list(alcance[:n_sub]))
+
+                self._ultimo_sub       = sub
+                self._ultimo_n_sistema = len(sistema)
+                geo_res, qnod_res = self._run_strategies(
+                    sub, alcance, mec,
+                    self._use_geo.get(), self._use_qnod.get())
+
+                if geo_res:
+                    self._ultimo_res_geo      = geo_res
+                    self._ultimo_res_geo_full = geo_res
+                    self._ultimo_t_geo        = geo_res.get("tiempo", 0)
+                if qnod_res:
+                    self._ultimo_res_qn = qnod_res
+                    self._ultimo_t_qn   = qnod_res.get("tiempo", 0)
+
+                elapsed = time.time() - t0
+                phi_g = geo_res.get("phi", float("inf"))  if geo_res  else float("inf")
+                phi_q = float("inf")
+                if qnod_res:
+                    por_k = qnod_res.get("resultados_por_k", {})
+                    rk2 = por_k.get(2)
+                    if rk2:
+                        phi_q = rk2.get("phi", float("inf"))
+
+                tag = "phi_zero" if min(phi_g, phi_q) < 1e-9 else "phi_nonzero"
+                vals = (i, alcance, mec, sub.n if sub else "?",
+                        f"{phi_g:.6f}" if phi_g < float("inf") else "∞",
+                        f"{phi_q:.6f}" if phi_q < float("inf") else "∞",
+                        f"{elapsed:.2f}")
+                self.after(0, lambda v=vals, tg=tag:
+                    self._suite_tree.insert("", tk.END, values=v, tags=(tg,)))
+
+                resultados_csv.append({
+                    "prueba": i, "alcance": alcance, "mecanismo": mec,
+                    "n_sub": sub.n if sub else 0,
+                    "phi_geo": phi_g, "phi_qn": phi_q, "tiempo_s": elapsed
+                })
+
+                if csv_p:
+                    self._exportar_a_excel_path(csv_p, alcance, mec, len(sistema))
+
+                self._historial_analisis.append({
+                    "alcance": alcance, "mecanismo": mec, "n_sistema": len(sistema),
+                    "res_geo": geo_res, "res_geo_full": geo_res,
+                    "res_qn": qnod_res, "sub": sub,
+                    "t_geo": self._ultimo_t_geo, "t_qn": self._ultimo_t_qn,
+                })
+                self.after(0, self._actualizar_historial_tree)
+
+            except Exception as exc:
+                import traceback
+                self._post(kind="log", text=f"  ✗ Error: {exc}", tag="err")
+                vals = (i, alcance, mec, "?", "ERR", "ERR", "0")
+                self.after(0, lambda v=vals:
+                    self._suite_tree.insert("", tk.END, values=v, tags=("error_row",)))
+
+        # Guardar CSV de suite
+        os.makedirs("results", exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        suite_csv = f"results/suite_{key.replace('=','').lower()}_{ts}.csv"
+        try:
+            with open(suite_csv, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=["prueba","alcance","mecanismo",
+                                                   "n_sub","phi_geo","phi_qn","tiempo_s"])
+                w.writeheader(); w.writerows(resultados_csv)
+            self._post(kind="log", text=f"\n✅ Suite {key} completada. CSV: {suite_csv}", tag="ok")
+        except Exception as e:
+            self._post(kind="log", text=f"  ⚠ No se pudo guardar CSV: {e}", tag="warn")
+
+        self._post(kind="status", text=f"Suite {key} completada — {total} pruebas")
+        self._suite_running     = False
+        self._modo_suite_activo = False
+
+    # ── Historial ─────────────────────────────────────────────────────────────
+
+    def _actualizar_historial_tree(self):
+        for item in self._hist_tree.get_children():
+            self._hist_tree.delete(item)
+        for idx, h in enumerate(self._historial_analisis, 1):
+            geo = h.get("res_geo")
+            qn  = h.get("res_qn")
+            sub = h.get("sub")
+            etqs = sub.etiquetas if sub else []
+            phi_g = geo.get("phi", float("inf")) if geo else float("inf")
+            phi_q = float("inf")
+            if qn:
+                rk2 = qn.get("resultados_por_k", {}).get(2)
+                if rk2:
+                    phi_q = rk2.get("phi", float("inf"))
+            bip = ""
+            if geo and sub:
+                p1, p2 = geo.get("biparticion", ([], []))
+                s1 = "".join(etqs[i] for i in p1 if i < len(etqs))
+                s2 = "".join(etqs[i] for i in p2 if i < len(etqs))
+                bip = f"{{{s1}}}|{{{s2}}}"
+            tag = "phi_zero" if phi_g < 1e-9 else "phi_nonzero"
+            vals = (idx, h.get("alcance",""), h.get("mecanismo",""),
+                    sub.n if sub else "?",
+                    f"{phi_g:.6f}" if phi_g < float("inf") else "∞",
+                    bip,
+                    f"{phi_q:.6f}" if phi_q < float("inf") else "∞",
+                    f"{h.get('t_geo',0):.3f}", f"{h.get('t_qn',0):.3f}")
+            self._hist_tree.insert("", tk.END, values=vals, tags=(tag,))
+
+    def _exportar_historial_excel(self):
+        if not self._historial_analisis:
+            messagebox.showinfo("Sin datos", "El historial está vacío."); return
+        path = filedialog.asksaveasfilename(
+            title="Guardar historial",
+            defaultextension=".csv",
+            filetypes=[("CSV", "*.csv"), ("Todos", "*.*")])
+        if not path:
             return
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["#","Alcance","Mecanismo","n","phi_geo","biparticion",
+                            "phi_qn","t_geo","t_qn"])
+                for idx, h in enumerate(self._historial_analisis, 1):
+                    geo = h.get("res_geo")
+                    qn  = h.get("res_qn")
+                    sub = h.get("sub")
+                    etqs = sub.etiquetas if sub else []
+                    phi_g = geo.get("phi", float("inf")) if geo else float("inf")
+                    phi_q = float("inf")
+                    if qn:
+                        rk2 = qn.get("resultados_por_k", {}).get(2)
+                        if rk2:
+                            phi_q = rk2.get("phi", float("inf"))
+                    bip = ""
+                    if geo and sub:
+                        p1, p2 = geo.get("biparticion", ([],[]))
+                        s1 = "".join(etqs[i] for i in p1 if i < len(etqs))
+                        s2 = "".join(etqs[i] for i in p2 if i < len(etqs))
+                        bip = f"{s1}|{s2}"
+                    w.writerow([idx, h.get("alcance",""), h.get("mecanismo",""),
+                                sub.n if sub else "",
+                                f"{phi_g:.8f}" if phi_g < float("inf") else "",
+                                bip,
+                                f"{phi_q:.8f}" if phi_q < float("inf") else "",
+                                f"{h.get('t_geo',0):.4f}",
+                                f"{h.get('t_qn',0):.4f}"])
+            messagebox.showinfo("Exportado", f"Historial guardado en:\n{path}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
-        # ── Último análisis (bloque más reciente) ─────────────────────────
-        r = self._excel_rows[-1]
-        lines.append(
-            f"  Análisis #{r['prueba']:>2}  │  "
-            f"Alcance: {r['alcance']:<12}  │  Mec: {r['mec']}")
-        lines.append("─" * 40)
-
-        g = r['geo']
-        if g['part'] != '—':
-            lines.append(
-                f"{2:>2}  {'KGeoMIP':<12}  "
-                f"{g['part'][:28]:<28}  {g['phi']:>12}  {g['t']:>10}")
-
-        for k in [3, 4, 5]:
-            q = r['qn'].get(k, {'part': '—', 'phi': '—', 't': '—'})
-            if q['part'] != '—':
-                lines.append(
-                    f"{k:>2}  {'KQNodes':<12}  "
-                    f"{q['part'][:28]:<28}  {q['phi']:>12}  {q['t']:>10}")
-
-        for k in [3, 4, 5]:
-            gk = r.get('geo_kn', {}).get(k, {'part': '—', 'phi': '—', 't': '—'})
-            if gk['part'] != '—':
-                lines.append(
-                    f"{k:>2}  {'KGeoMIP':<12}  "
-                    f"{gk['part'][:28]:<28}  {gk['phi']:>12}  {gk['t']:>10}")
-
-        # ── Historial acumulado (si hay más de un análisis) ───────────────
-        if len(self._excel_rows) > 1:
-            lines.append("")
-            lines.append(sep)
-            lines.append(
-                f"  Historial: {len(self._excel_rows)} análisis listos para exportar")
-            lines.append(sep)
-            lines.append(
-                f"{'#':>3}  {'Alcance':<12}  {'Mec':<12}  "
-                f"{'Geo-k2 φ':>10}  {'QN-k3 φ':>10}  "
-                f"{'QN-k4 φ':>10}  {'QN-k5 φ':>10}")
-            lines.append("─" * 72)
-            for hr in self._excel_rows:
-                hg  = hr['geo']
-                hq3 = hr['qn'].get(3, {'phi': '—'})
-                hq4 = hr['qn'].get(4, {'phi': '—'})
-                hq5 = hr['qn'].get(5, {'phi': '—'})
-                lines.append(
-                    f"{hr['prueba']:>3}  "
-                    f"{hr['alcance'][:12]:<12}  {hr['mec'][:12]:<12}  "
-                    f"{hg['phi']:>10}  {hq3['phi']:>10}  "
-                    f"{hq4['phi']:>10}  {hq5['phi']:>10}")
-
-        lines.append("")
-        lines.append("  → Pulsa '📤 Exportar a Excel' para escribir en DatosPruebas2026_1.xlsx")
-
-        self._tab_set(self._tab_excel_txt, "\n".join(lines))
+    # ── Excel export ──────────────────────────────────────────────────────────
 
     def _exportar_a_excel(self):
-        try:
-            import openpyxl
-        except ImportError:
-            messagebox.showerror(
-                "openpyxl no instalado",
-                "Instala la dependencia:\n  pip install openpyxl\n\n"
-                "Luego reinicia la interfaz.")
-            return
-
-        if self._ultimo_res_geo is None and self._ultimo_res_qn is None:
-            messagebox.showinfo("Sin datos",
-                                "Ejecuta un análisis antes de exportar.")
-            return
-
-        # Determinar hoja según N del sistema completo
-        # Preferir _ultimo_n_sistema (válido tras análisis/suite) sobre campo UI
-        n_total = (self._ultimo_n_sistema
-                   or len(self._sys_var.get().strip()))
+        n_total = (self._ultimo_n_sistema or len(self._sys_var.get().strip()))
         hoja_nombre = HOJAS_EXCEL.get(n_total)
         if not hoja_nombre:
             messagebox.showwarning(
                 "Excel",
-                f"N={n_total} no tiene hoja en el Excel.\n"
-                f"Hojas disponibles: N={list(HOJAS_EXCEL.keys())}")
-            return
+                f"N={n_total} no tiene hoja configurada.\n"
+                f"Disponibles: N={list(HOJAS_EXCEL.keys())}"); return
 
-        # Buscar el Excel en rutas comunes
         rutas = [
             'DatosPruebas2026_1.xlsx',
-            os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                         'DatosPruebas2026_1.xlsx'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'DatosPruebas2026_1.xlsx'),
             '../DatosPruebas2026_1.xlsx',
-            '../../DatosPruebas2026_1.xlsx',
         ]
         excel_path = next((r for r in rutas if os.path.exists(r)), None)
         if not excel_path:
             excel_path = filedialog.askopenfilename(
                 title="Selecciona DatosPruebas2026_1.xlsx",
-                filetypes=[("Excel files", "*.xlsx"), ("Todos", "*.*")]
-            )
+                filetypes=[("Excel files","*.xlsx"),("Todos","*.*")])
         if not excel_path:
             return
 
         try:
+            import openpyxl
             wb = openpyxl.load_workbook(excel_path)
             if hoja_nombre not in wb.sheetnames:
-                messagebox.showwarning(
-                    "Excel",
-                    f"Hoja '{hoja_nombre}' no encontrada.\n"
-                    f"Hojas disponibles: {', '.join(wb.sheetnames)}")
-                wb.close()
-                return
+                messagebox.showwarning("Excel",
+                    f"Hoja '{hoja_nombre}' no encontrada.\nHojas: {', '.join(wb.sheetnames)}")
+                wb.close(); return
 
-            ws = wb[hoja_nombre]
-
-            alcance   = self._alc_var.get().strip().upper()
-            mecanismo = self._mec_var.get().strip().upper()
-
-            # Buscar fila por Alcance (col B=2) y Mecanismo (col C=3), desde fila 6
+            ws      = wb[hoja_nombre]
+            alcance = self._alc_var.get().strip().upper()
+            mec     = self._mec_var.get().strip().upper()
             fila_destino = None
             for row in ws.iter_rows(min_row=6, max_col=3, values_only=False):
-                cell_alc = row[1]   # col B (índice 1)
-                cell_mec = row[2]   # col C (índice 2)
-                if (str(cell_alc.value or '').strip().upper() == alcance and
-                        str(cell_mec.value or '').strip().upper() == mecanismo):
-                    fila_destino = cell_alc.row
-                    break
+                if (str(row[1].value or "").strip().upper() == alcance and
+                        str(row[2].value or "").strip().upper() == mec):
+                    fila_destino = row[1].row; break
 
             if fila_destino is None:
-                messagebox.showwarning(
-                    "Excel",
-                    f"No se encontró la combinación:\n"
-                    f"  Alcance   = {alcance}\n"
-                    f"  Mecanismo = {mecanismo}\n\n"
-                    f"en la hoja '{hoja_nombre}'.\n"
-                    f"Verifica que la fila exista con esos valores en cols B y C.")
-                wb.close()
-                return
+                messagebox.showwarning("Excel",
+                    f"No se encontró Alcance={alcance} / Mecanismo={mec} en '{hoja_nombre}'")
+                wb.close(); return
 
-            # ── Mapeo de columnas (D=4 … AA=27) ──────────────────────────
-            # Col D:  QNodes k=2  Partición   Col E:  QNodes k=2  Pérdida
-            # Col F:  QNodes k=2  Tiempo      Col G:  Geometric k=2  Partición
-            # Col H:  Geometric k=2  Pérdida  Col I:  Geometric k=2  Tiempo
-            # Col J:  QNodes k=3  Partición   Col K:  QNodes k=3  Pérdida
-            # Col L:  QNodes k=3  Tiempo      Col M:  Geometric k=3  Partición
-            # Col N:  Geometric k=3  Pérdida  Col O:  Geometric k=3  Tiempo
-            # Col P:  QNodes k=4  Partición   Col Q:  QNodes k=4  Pérdida
-            # Col R:  QNodes k=4  Tiempo      Col S:  Geometric k=4  Partición
-            # Col T:  Geometric k=4  Pérdida  Col U:  Geometric k=4  Tiempo
-            # Col V:  QNodes k=5  Partición   Col W:  QNodes k=5  Pérdida
-            # Col X:  QNodes k=5  Tiempo      Col Y:  Geometric k=5  Partición
-            # Col Z:  Geometric k=5  Pérdida  Col AA: Geometric k=5  Tiempo
-            COL = {
-                'qnodes_k2_part': 4,  'qnodes_k2_perd': 5,  'qnodes_k2_t': 6,
-                'geo_k2_part':    7,  'geo_k2_perd':    8,  'geo_k2_t':    9,
-                'qnodes_k3_part': 10, 'qnodes_k3_perd': 11, 'qnodes_k3_t': 12,
-                'geo_k3_part':    13, 'geo_k3_perd':    14, 'geo_k3_t':    15,
-                'qnodes_k4_part': 16, 'qnodes_k4_perd': 17, 'qnodes_k4_t': 18,
-                'geo_k4_part':    19, 'geo_k4_perd':    20, 'geo_k4_t':    21,
-                'qnodes_k5_part': 22, 'qnodes_k5_perd': 23, 'qnodes_k5_t': 24,
-                'geo_k5_part':    25, 'geo_k5_perd':    26, 'geo_k5_t':    27,
-            }
-
-            def escribir(col_key, valor):
-                if valor is not None:
-                    ws.cell(row=fila_destino, column=COL[col_key], value=valor)
+            COL = {'qnodes_k2_part':4,'qnodes_k2_perd':5,'qnodes_k2_t':6,
+                   'geo_k2_part':7,'geo_k2_perd':8,'geo_k2_t':9,
+                   'qnodes_k3_part':10,'qnodes_k3_perd':11,'qnodes_k3_t':12,
+                   'geo_k3_part':13,'geo_k3_perd':14,'geo_k3_t':15,
+                   'qnodes_k4_part':16,'qnodes_k4_perd':17,'qnodes_k4_t':18,
+                   'geo_k4_part':19,'geo_k4_perd':20,'geo_k4_t':21,
+                   'qnodes_k5_part':22,'qnodes_k5_perd':23,'qnodes_k5_t':24,
+                   'geo_k5_part':25,'geo_k5_perd':26,'geo_k5_t':27}
 
             etqs = self._ultimo_sub.etiquetas if self._ultimo_sub else []
+            def lbl(idxs):
+                return "".join(etqs[i] for i in idxs if i < len(etqs)) if etqs else ""
+            def w(key, val):
+                if val is not None:
+                    ws.cell(row=fila_destino, column=COL[key], value=val)
 
-            def lbl_part(idxs):
-                if not idxs or not etqs:
-                    return None
-                return "".join(etqs[i] for i in idxs if i < len(etqs))
-
-            # ── KGeoMIP k=2 → cols G,H,I ────────────────────────────────
             if self._ultimo_res_geo:
                 rg = self._ultimo_res_geo
-                p1, p2 = rg['biparticion']
-                part_str = (lbl_part(p1) or '') + '|' + (lbl_part(p2) or '')
-                escribir('geo_k2_part', part_str)
-                escribir('geo_k2_perd', round(float(rg['phi']), 8))
-                escribir('geo_k2_t',    round(float(self._ultimo_t_geo), 4))
+                p1, p2 = rg["biparticion"]
+                w("geo_k2_part", (lbl(p1) or "") + "|" + (lbl(p2) or ""))
+                w("geo_k2_perd", round(float(rg["phi"]), 8))
+                w("geo_k2_t",    round(float(self._ultimo_t_geo), 4))
 
-            # ── KQNodes k=3,4,5 → cols J..X ─────────────────────────────
             if self._ultimo_res_qn:
-                rq    = self._ultimo_res_qn
-                por_k = rq.get('resultados_por_k', {})
-                t_qn  = self._ultimo_t_qn
-
+                por_k = self._ultimo_res_qn.get("resultados_por_k", {})
                 for k_val in [3, 4, 5]:
-                    res_k = por_k.get(k_val)
-                    if not res_k or res_k.get('biparticion') is None:
-                        continue
-                    phi_k = res_k.get('phi', float('inf'))
-                    if phi_k >= float('inf'):
-                        continue
-                    parts = res_k['biparticion']
-                    part_str = ' | '.join(
-                        '{' + (lbl_part(p) or '?') + '}'
-                        for p in parts
-                    )
-                    escribir(f'qnodes_k{k_val}_part', part_str)
-                    escribir(f'qnodes_k{k_val}_perd', round(float(phi_k), 8))
-                    escribir(f'qnodes_k{k_val}_t',    round(float(t_qn), 4))
+                    rk = por_k.get(k_val)
+                    if rk and rk.get("biparticion") and rk.get("phi", float("inf")) < float("inf"):
+                        parts = rk["biparticion"]
+                        ps = " | ".join("{"+lbl(p)+"}" for p in parts)
+                        w(f"qnodes_k{k_val}_part", ps)
+                        w(f"qnodes_k{k_val}_perd", round(float(rk["phi"]), 8))
+                        w(f"qnodes_k{k_val}_t",    round(float(self._ultimo_t_qn), 4))
 
-            wb.save(excel_path)
-            wb.close()
-            messagebox.showinfo(
-                "Excel exportado",
-                f"✓ Datos escritos correctamente.\n\n"
-                f"  Hoja  : {hoja_nombre}\n"
-                f"  Fila  : {fila_destino}\n"
-                f"  Archivo: {excel_path}")
-
+            wb.save(excel_path); wb.close()
+            messagebox.showinfo("Excel exportado",
+                f"✓ Datos escritos.\n  Hoja: {hoja_nombre}\n  Fila: {fila_destino}\n  {excel_path}")
         except Exception as e:
             import traceback
-            messagebox.showerror(
-                "Error exportando",
-                f"{e}\n\n{traceback.format_exc()[:500]}")
+            messagebox.showerror("Error exportando", f"{e}\n\n{traceback.format_exc()[:500]}")
 
     def _exportar_a_excel_path(self, excel_path: str, alcance: str,
                                mecanismo: str, n_sistema: int = None):
-        """
-        Escribe resultados en DatosPruebas2026_1.xlsx en la hoja correspondiente.
-
-        Estructura de columnas (fila 6 en adelante, A=#Prueba, B=Alcance, C=Mecanismo):
-          D-F  : QNodes  Bipartición (k=2, derivada de k=3)
-          G-I  : Geometric Bipartición (k=2)
-          J-L  : QNodes  3-Partición (k=3)
-          M-O  : Geometric 3-Partición (k=3)  — vacío (KGeoMIP solo hace k=2)
-          P-R  : QNodes  4-Partición (k=4)
-          S-U  : Geometric 4-Partición (k=4)  — vacío
-          V-X  : QNodes  5-Partición (k=5)
-          Y-AA : Geometric 5-Partición (k=5)  — vacío
-        """
         try:
             import openpyxl
         except ImportError:
-            self._post(kind="log",
-                       text="  ✗ openpyxl no instalado (pip install openpyxl)",
-                       tag="err")
-            return
+            self._post(kind="log", text="  ✗ openpyxl no instalado", tag="err"); return
 
-        n_total = (n_sistema
-                   or self._ultimo_n_sistema
-                   or len(self._sys_var.get().strip()))
+        n_total     = n_sistema or self._ultimo_n_sistema or len(self._sys_var.get().strip())
         hoja_nombre = HOJAS_EXCEL.get(n_total)
         if not hoja_nombre:
-            self._post(kind="log",
-                       text=f"  ✗ N={n_total} sin hoja Excel configurada",
-                       tag="warn")
-            return
-
+            self._post(kind="log", text=f"  ✗ N={n_total} sin hoja Excel", tag="warn"); return
         if not os.path.exists(excel_path):
-            self._post(kind="log",
-                       text=f"  ✗ Archivo no encontrado: {excel_path}",
-                       tag="err")
-            return
+            self._post(kind="log", text=f"  ✗ Archivo no encontrado: {excel_path}", tag="err"); return
 
         try:
             wb = openpyxl.load_workbook(excel_path)
-
-            # Buscar hoja (tolerante a espacios y guiones)
             ws = None
-            for nombre_hoja in wb.sheetnames:
-                if nombre_hoja.strip() == hoja_nombre.strip():
-                    ws = wb[nombre_hoja]
-                    hoja_nombre = nombre_hoja
-                    break
+            for h in wb.sheetnames:
+                if h.strip() == hoja_nombre.strip():
+                    ws = wb[h]; hoja_nombre = h; break
             if ws is None:
-                norm = hoja_nombre.lower().replace('-', '').replace(' ', '')
-                hoja_alt = next(
-                    (h for h in wb.sheetnames
-                     if h.lower().replace('-', '').replace(' ', '') == norm),
-                    None
-                )
-                if hoja_alt:
-                    hoja_nombre = hoja_alt
-                    ws = wb[hoja_nombre]
-                    self._post(kind="log",
-                               text=f"  Usando hoja alternativa: '{hoja_nombre}'",
-                               tag="warn")
+                norm = hoja_nombre.lower().replace("-","").replace(" ","")
+                alt  = next((h for h in wb.sheetnames
+                             if h.lower().replace("-","").replace(" ","") == norm), None)
+                if alt:
+                    ws = wb[alt]; hoja_nombre = alt
+                    self._post(kind="log", text=f"  Usando hoja: '{hoja_nombre}'", tag="warn")
                 else:
-                    hojas_disp = wb.sheetnames
                     wb.close()
-                    self._post(kind="log",
-                               text=f"  ✗ Hoja '{hoja_nombre}' no encontrada. "
-                                    f"Disponibles: {hojas_disp}",
-                               tag="err")
+                    self._post(kind="log", text=f"  ✗ Hoja '{hoja_nombre}' no encontrada", tag="err")
                     return
 
-            # Buscar fila por Alcance (col B) y Mecanismo (col C), desde fila 6
             alc_up = alcance.strip().upper()
             mec_up = mecanismo.strip().upper()
             fila_destino = None
             for row in ws.iter_rows(min_row=6, max_col=3, values_only=False):
-                val_b = str(row[1].value or '').strip().upper()
-                val_c = str(row[2].value or '').strip().upper()
-                if val_b == alc_up and val_c == mec_up:
-                    fila_destino = row[0].row
-                    break
+                if (str(row[1].value or "").strip().upper() == alc_up and
+                        str(row[2].value or "").strip().upper() == mec_up):
+                    fila_destino = row[0].row; break
 
             if fila_destino is None:
                 self._post(kind="log",
-                           text=f"  ⚠ Fila no encontrada: alcance={alc_up} mec={mec_up}",
-                           tag="warn")
-                wb.close()
-                return
+                           text=f"  ⚠ Fila no encontrada: {alc_up}/{mec_up}", tag="warn")
+                wb.close(); return
 
             etqs = self._ultimo_sub.etiquetas if self._ultimo_sub else []
-
-            def w(col, valor):
-                if valor is not None and valor != '':
-                    ws.cell(row=fila_destino, column=col, value=valor)
-
-            def fmt_part_geo(bip):
-                if not bip:
-                    return None
-                p1, p2 = bip
-                s1 = ''.join(etqs[i] for i in p1 if i < len(etqs)) if p1 else ''
-                s2 = ''.join(etqs[i] for i in p2 if i < len(etqs)) if p2 else ''
-                return '∅' if not s1 and not s2 else f"{s1}|{s2}"
-
-            def fmt_part_qn(parts):
-                if not parts:
-                    return None
-                return ' | '.join(
-                    '{' + ''.join(etqs[v] for v in p if v < len(etqs)) + '}'
-                    for p in parts
-                )
+            def lbl(idxs):
+                return "".join(etqs[v] for v in idxs if v < len(etqs)) if etqs else ""
+            def wr(col, val):
+                if val is not None and val != "":
+                    ws.cell(row=fila_destino, column=col, value=val)
 
             res_geo = self._ultimo_res_geo
             res_qn  = self._ultimo_res_qn
-            # _run_strategies almacena resultados por k bajo la clave 'por_k'
-            por_k   = res_qn.get('por_k', {}) if res_qn else {}
+            por_k   = res_qn.get("resultados_por_k", {}) if res_qn else {}
 
-            # ── BLOQUE 1: QNodes k=2 → cols D(4), E(5), F(6) ─────────────
-            # KQNodes no calcula k=2; se usa la primera parte de k=3 vs el
-            # resto como bipartición implícita para rellenar la columna.
+            # QNodes k=2 (derivada de k=3)
             rk3 = por_k.get(3)
-            if rk3 and rk3.get('biparticion') and rk3.get('phi', float('inf')) < float('inf'):
-                parts_k3 = rk3['biparticion']
-                if len(parts_k3) >= 2:
-                    p1_vars = parts_k3[0]
-                    p2_vars = [v for p in parts_k3[1:] for v in p]
-                    s1 = ''.join(etqs[v] for v in p1_vars if v < len(etqs))
-                    s2 = ''.join(etqs[v] for v in p2_vars if v < len(etqs))
-                    w(4, f"{s1}|{s2}")
-                    w(5, round(float(rk3['phi']), 8))
-                    t_qn_k2 = res_qn.get('tiempo', self._ultimo_t_qn) if res_qn else 0.0
-                    w(6, round(float(t_qn_k2), 4))
+            if rk3 and rk3.get("biparticion") and rk3.get("phi", float("inf")) < float("inf"):
+                parts3 = rk3["biparticion"]
+                if len(parts3) >= 2:
+                    s1 = lbl(parts3[0])
+                    s2 = "".join(lbl(p) for p in parts3[1:])
+                    wr(4, f"{s1}|{s2}")
+                    wr(5, round(float(rk3["phi"]), 8))
+                    t_qn = res_qn.get("tiempo", self._ultimo_t_qn) if res_qn else 0
+                    wr(6, round(float(t_qn), 4))
 
-            # ── BLOQUE 2: Geometric k=2 → cols G(7), H(8), I(9) ──────────
-            if res_geo and res_geo.get('biparticion'):
-                part_g = fmt_part_geo(res_geo['biparticion'])
-                if part_g is not None:
-                    w(7, part_g)
-                w(8, round(float(res_geo['phi']), 8))
-                w(9, round(float(self._ultimo_t_geo), 4))
+            # Geo k=2
+            if res_geo and res_geo.get("biparticion"):
+                p1, p2 = res_geo["biparticion"]
+                s1 = lbl(p1); s2 = lbl(p2)
+                part_g = f"{s1}|{s2}" if (s1 or s2) else "∅"
+                wr(7, part_g)
+                wr(8, round(float(res_geo["phi"]), 8))
+                wr(9, round(float(self._ultimo_t_geo), 4))
 
-            # ── BLOQUES 3-8: QNodes k=3,4,5 ──────────────────────────────
-            # QNodes k=3 → J(10),K(11),L(12)
-            # QNodes k=4 → P(16),Q(17),R(18)
-            # QNodes k=5 → V(22),W(23),X(24)
-            COL_QN = {3: 10, 4: 16, 5: 22}
+            # QNodes k=3,4,5
+            COL_QN = {3:10, 4:16, 5:22}
             for k_val in [3, 4, 5]:
-                col_qn = COL_QN[k_val]
                 rk = por_k.get(k_val)
-                if (rk and rk.get('biparticion') is not None
-                        and rk.get('phi', float('inf')) < float('inf')):
-                    part_str = fmt_part_qn(rk['biparticion'])
-                    w(col_qn,     part_str)
-                    w(col_qn + 1, round(float(rk['phi']), 8))
-                    t_k_individual = rk.get('tiempo', 0.0)
-                    if t_k_individual <= 0 and self._ultimo_t_qn > 0:
-                        t_k_individual = self._ultimo_t_qn / 3
-                    w(col_qn + 2, round(float(t_k_individual), 4))
+                if rk and rk.get("biparticion") and rk.get("phi", float("inf")) < float("inf"):
+                    parts    = rk["biparticion"]
+                    part_str = " | ".join("{"+lbl(p)+"}" for p in parts)
+                    col_qn   = COL_QN[k_val]
+                    wr(col_qn,     part_str)
+                    wr(col_qn + 1, round(float(rk["phi"]), 8))
+                    t_k = rk.get("tiempo", self._ultimo_t_qn / 3 if self._ultimo_t_qn > 0 else 0)
+                    wr(col_qn + 2, round(float(t_k), 4))
 
-            # ── BLOQUES Geometric k=3,4,5 → M(13),N(14),O(15) / S(19),T(20),U(21) / Y(25),Z(26),AA(27) ──
-            res_geo_full = getattr(self, '_ultimo_res_geo_full', None)
-            por_k_geo    = res_geo_full.get('resultados_por_k', {}) if res_geo_full else {}
-            GEO_KN_COL   = {3: 13, 4: 19, 5: 25}
+            # Geo k=3,4,5
+            res_geo_full = getattr(self, "_ultimo_res_geo_full", None)
+            por_k_geo    = res_geo_full.get("resultados_por_k", {}) if res_geo_full else {}
+            GEO_COL = {3:13, 4:19, 5:25}
             for k_val in [3, 4, 5]:
-                col_start = GEO_KN_COL[k_val]
                 rk = por_k_geo.get(k_val)
-                if (rk and rk.get('biparticion') is not None
-                        and rk.get('phi', float('inf')) < float('inf')):
-                    parts    = rk['biparticion']
-                    part_str = fmt_part_qn(parts)
-                    w(col_start,     part_str)
-                    w(col_start + 1, round(float(rk['phi']), 8))
-                    w(col_start + 2, round(float(rk.get('tiempo', 0.0)), 4))
+                if rk and rk.get("biparticion") and rk.get("phi", float("inf")) < float("inf"):
+                    parts    = rk["biparticion"]
+                    part_str = " | ".join("{"+lbl(p)+"}" for p in parts)
+                    cs = GEO_COL[k_val]
+                    wr(cs,     part_str)
+                    wr(cs + 1, round(float(rk["phi"]), 8))
+                    wr(cs + 2, round(float(rk.get("tiempo", 0)), 4))
 
             try:
-                wb.save(excel_path)
-                wb.close()
-                self._post(kind="log",
-                           text=f"  ✓ Excel: {hoja_nombre} fila {fila_destino}",
-                           tag="ok")
+                wb.save(excel_path); wb.close()
+                self._post(kind="log", text=f"  ✓ Excel: {hoja_nombre} fila {fila_destino}", tag="ok")
             except PermissionError:
-                dir_destino = os.path.dirname(os.path.abspath(excel_path))
-                nombre_base = os.path.splitext(os.path.basename(excel_path))[0]
-                copia_path  = os.path.join(
-                    dir_destino,
-                    f"{nombre_base}_KQNODES_EXPORT.xlsx"
-                )
+                dir_d    = os.path.dirname(os.path.abspath(excel_path))
+                base     = os.path.splitext(os.path.basename(excel_path))[0]
+                copia    = os.path.join(dir_d, f"{base}_EXPORT.xlsx")
                 try:
-                    wb.save(copia_path)
-                    wb.close()
-                    self._post(kind="log",
-                               text=(f"  ⚠ Excel abierto — guardado como:\n"
-                                     f"    {copia_path}"),
-                               tag="warn")
+                    wb.save(copia); wb.close()
+                    self._post(kind="log", text=f"  ⚠ Excel abierto — guardado como: {copia}", tag="warn")
                 except Exception as e2:
-                    self._post(kind="log",
-                               text=f"  ✗ No se pudo guardar copia: {e2}",
-                               tag="err")
-                if not getattr(self, '_modo_suite_activo', False):
-                    from tkinter import messagebox
-                    messagebox.showwarning(
-                        "Excel en uso",
-                        f"El archivo está abierto en Excel.\n\n"
-                        f"Los datos se guardaron en:\n{copia_path}\n\n"
-                        f"Cierra Excel y luego copia los datos al archivo original."
-                    )
+                    self._post(kind="log", text=f"  ✗ No se pudo guardar: {e2}", tag="err")
 
         except Exception as e:
             import traceback
             self._post(kind="log",
-                       text=f"  ✗ Error Excel: {e}\n{traceback.format_exc()[:300]}",
-                       tag="err")
+                       text=f"  ✗ Error Excel: {e}\n{traceback.format_exc()[:300]}", tag="err")
 
-    # ── Guardar CSV ────────────────────────────────────────────────────────
+    # ── Validación §5.2.2 ─────────────────────────────────────────────────────
+
+    def _val_append(self, text: str, tag: str = "") -> None:
+        def _do():
+            self._tab_validacion_txt.configure(state=tk.NORMAL)
+            self._tab_validacion_txt.insert(tk.END, text + "\n", (tag,) if tag else ())
+            self._tab_validacion_txt.see(tk.END)
+            self._tab_validacion_txt.configure(state=tk.DISABLED)
+        self.after(0, _do)
+
+    def _run_val_subprocess(self, cmd_args: list, desc: str) -> None:
+        import subprocess
+        self._val_append("="*55, "info")
+        self._val_append(f"  {desc}", "info")
+        self._val_append(f"  $ {' '.join(cmd_args)}", "info")
+        self._val_append("="*55, "info")
+        self._nb.select(2)  # Validación tab
+
+        def _run():
+            try:
+                proc = subprocess.Popen(
+                    cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, encoding="utf-8", errors="replace",
+                    cwd=os.path.dirname(os.path.abspath(__file__)))
+                for line in proc.stdout:
+                    self._val_append(line.rstrip())
+                proc.wait()
+                tag = "ok" if proc.returncode == 0 else "warn"
+                self._val_append(f"\n  Terminó con código {proc.returncode}", tag)
+            except Exception as exc:
+                self._val_append(f"  ERROR: {exc}", "err")
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _run_val_generar(self):
+        self._run_val_subprocess(
+            [sys.executable, "tests/leer_excel_referencia.py"],
+            "Generando casos de referencia desde PruebasIniciales.xlsx…")
+
+    def _run_val_kgeomip(self):
+        self._run_val_subprocess(
+            [sys.executable, "tests/ejecutar_validacion.py", "--estrategia", "geomip"],
+            "Validando KGeoMIP contra casos de referencia…")
+
+    def _run_val_kqnodes(self):
+        self._run_val_subprocess(
+            [sys.executable, "tests/ejecutar_validacion.py", "--estrategia", "qnodes"],
+            "Validando KQNodes (k=2 exhaustivo) contra casos de referencia…")
+
+    def _run_val_ambas(self):
+        self._run_val_subprocess(
+            [sys.executable, "tests/ejecutar_validacion.py"],
+            "Validando KGeoMIP + KQNodes (resumen comparativo)…")
+
+    # ── Exportar plataformas ───────────────────────────────────────────────────
 
     def _completar_plataformas(self):
-        import platform, psutil, openpyxl, multiprocessing
-
+        import platform, multiprocessing
+        try:
+            import psutil
+        except ImportError:
+            messagebox.showwarning("psutil", "pip install psutil para usar esta función"); return
         excel_path = filedialog.askopenfilename(
             title="Selecciona DatosPruebas2026_1.xlsx",
-            filetypes=[("Excel files", "*.xlsx")]
-        )
+            filetypes=[("Excel files","*.xlsx")])
         if not excel_path:
             return
         try:
+            import openpyxl
             wb = openpyxl.load_workbook(excel_path)
-            ws = wb['plataformas']
-
-            ram_gb = round(psutil.virtual_memory().total / (1024 ** 3), 0)
+            ws = wb["plataformas"]
+            ram_gb = round(psutil.virtual_memory().total / (1024**3), 0)
             so     = f"{platform.system()} {platform.release()}"
             proc   = platform.processor() or platform.machine()
-            freq   = ''
+            freq   = ""
             try:
-                freq_info = psutil.cpu_freq()
-                if freq_info:
-                    freq = f"{freq_info.max / 1000:.2f} GHz"
+                fi = psutil.cpu_freq()
+                if fi:
+                    freq = f"{fi.max/1000:.2f} GHz"
             except Exception:
                 pass
             ncpus = multiprocessing.cpu_count()
-
-            ws['B3'] = proc
-            ws['C3'] = f"{int(ram_gb)} GB"
-            ws['D3'] = so
-            ws['B4'] = f"{freq}  {ncpus} núcleos".strip()
-
-            wb.save(excel_path)
-            wb.close()
-            messagebox.showinfo(
-                "Plataformas",
-                f"Información del sistema escrita en hoja 'plataformas':\n"
-                f"Procesador : {proc}\n"
-                f"RAM        : {int(ram_gb)} GB\n"
-                f"S.O.       : {so}\n"
-                f"CPU        : {freq}  {ncpus} núcleos"
-            )
+            ws["B3"] = proc
+            ws["C3"] = f"{int(ram_gb)} GB"
+            ws["D3"] = so
+            ws["B4"] = f"{freq}  {ncpus} núcleos".strip()
+            wb.save(excel_path); wb.close()
+            messagebox.showinfo("Plataformas",
+                f"Información escrita:\n  CPU: {proc}\n  RAM: {int(ram_gb)} GB\n"
+                f"  S.O.: {so}\n  Freq: {freq}  {ncpus} núcleos")
         except Exception as e:
-            messagebox.showerror("Error al completar plataformas", str(e))
+            messagebox.showerror("Error plataformas", str(e))
+
+    # ── Guardar CSV ───────────────────────────────────────────────────────────
 
     def _save(self):
         if not self._results:
-            messagebox.showinfo("Sin datos", "No hay resultados para guardar.")
-            return
+            messagebox.showinfo("Sin datos", "No hay resultados para guardar."); return
         os.makedirs("results", exist_ok=True)
         ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = f"results/resultado_manual_{ts}.csv"
         with open(path, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow(["Estrategia", "k", "Partición",
-                        "Pérdida (φ)", "Tiempo (s)"])
+            w.writerow(["Estrategia","k","Partición","Pérdida (φ)","Tiempo (s)"])
             w.writerows(self._results)
         messagebox.showinfo("Guardado", f"Resultados exportados a:\n{path}")
 
