@@ -729,7 +729,6 @@ class App(tk.Tk):
         t.start()
 
     def _worker(self):
-        import numpy as np
         sistema  = self._sys_var.get().strip().upper()
         estado   = self._est_var.get().strip()
         csv_path = self._csv_var.get().strip()
@@ -744,17 +743,23 @@ class App(tk.Tk):
         sub = None
 
         try:
-            if csv_path and os.path.exists(csv_path):
+            n_sistema = len(sistema)
+            usar_sintetico = n_sistema > 20
+
+            if usar_sintetico:
+                # Para N>20 el CSV completo no es viable en memoria/disco
+                # (N=25 → ~6.7 GB). Se usa TPM sintética determinista.
+                self._post(kind="log",
+                           text=f"⚡ N={n_sistema} > 20: TPM sintética "
+                                f"(seed={n_sistema}, 2^20 filas)",
+                           tag="warn")
+                sys_full = System.sintetico(n_sistema, estado, seed=n_sistema)
+            elif csv_path and os.path.exists(csv_path):
                 self._post(kind="log", text=f"📂 CSV: {csv_path}", tag="info")
                 sys_full = System.desde_csv(csv_path, estado)
                 if sys_full.tpm.shape[0] != 2**sys_full.n:
                     n_filas, n_vars = sys_full.tpm.shape
-                    if sys_full.n > 20 and n_filas == 2**20:
-                        self._post(kind="log",
-                                   text=f"  ⚠ CSV truncado a 2^20={n_filas:,} filas "
-                                        f"(N={sys_full.n} > 20, límite de memoria)",
-                                   tag="warn")
-                    elif n_vars > 0 and n_filas == 2**n_vars:
+                    if n_vars > 0 and n_filas == 2**n_vars:
                         estado_csv = (estado + '0'*n_vars)[:n_vars]
                         sys_full = System.desde_csv(csv_path, estado_csv)
                         self._post(kind="log",
@@ -762,31 +767,26 @@ class App(tk.Tk):
                                    tag="warn")
                     else:
                         raise ValueError(f"CSV no reconocido: {sys_full.tpm.shape}")
-                self._post(kind="status", text="Construyendo subsistema…")
-                self._post(kind="log", text=f"🔧 Subsistema: alcance={alcance} mec={mec}", tag="info")
-                sub = sys_full.construir_subsistema(list(alcance), list(mec))
-                if sub.n != sub.tpm.shape[1]:
-                    cols_elim = list(range(sub.n, sub.tpm.shape[1]))
-                    if cols_elim:
-                        sub = sub.marginalizar_columnas(cols_elim)
-                if sub.n > 0 and sub.tpm.shape[0] != 2**sub.n:
-                    self._post(kind="log",
-                               text=f"  ⚠ Forma inusual: {sub.tpm.shape[0]} filas ≠ 2^{sub.n}",
-                               tag="warn")
-                if sub.n == 0:
-                    self._post(kind="log",
-                               text="  ⚠ Alcance ∩ Mecanismo = ∅ → φ = 0", tag="warn")
             else:
-                n_sub  = min(len(alcance), len(mec))
-                n_rows = 2**min(n_sub, 20)
-                seed   = sum(ord(c) for c in estado + alcance + mec) % (2**31)
-                rng    = np.random.default_rng(seed)
-                tpm    = rng.random((n_rows, n_sub))
-                est_s  = (estado + "0"*n_sub)[:n_sub]
-                sub    = System(tpm, est_s, list(alcance[:n_sub]))
                 self._post(kind="log",
-                           text=f"⚡ CSV no encontrado → subsistema sintético n={n_sub}",
+                           text=f"⚡ CSV no encontrado → TPM sintética (seed={n_sistema})",
                            tag="warn")
+                sys_full = System.sintetico(n_sistema, estado, seed=n_sistema)
+
+            self._post(kind="status", text="Construyendo subsistema…")
+            self._post(kind="log", text=f"🔧 Subsistema: alcance={alcance} mec={mec}", tag="info")
+            sub = sys_full.construir_subsistema(list(alcance), list(mec))
+            if sub.n != sub.tpm.shape[1]:
+                cols_elim = list(range(sub.n, sub.tpm.shape[1]))
+                if cols_elim:
+                    sub = sub.marginalizar_columnas(cols_elim)
+            if sub.n > 0 and sub.tpm.shape[0] != 2**sub.n:
+                self._post(kind="log",
+                           text=f"  ⚠ Forma inusual: {sub.tpm.shape[0]} filas ≠ 2^{sub.n}",
+                           tag="warn")
+            if sub.n == 0:
+                self._post(kind="log",
+                           text="  ⚠ Alcance ∩ Mecanismo = ∅ → φ = 0", tag="warn")
 
             self._post(kind="log",
                        text=f"  n={sub.n}  |  etiquetas={''.join(sub.etiquetas)}  |  tpm={sub.tpm.shape}",
