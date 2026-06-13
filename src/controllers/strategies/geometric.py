@@ -20,7 +20,9 @@ def _calcular_tensor_paralelo(args):
     """
     var_idx, tensor_list, n, idx_inicio, modo_sparse = args
     tensor = np.array(tensor_list, dtype=np.float64)
-    num_estados = 2 ** n
+    # Usar el tamaño real del tensor, no 2**n.
+    # Para TPMs truncadas (N>20) tensor tiene 2^20 filas en lugar de 2^n.
+    num_estados = len(tensor)
 
     def bfs_desde(i):
         """BFS vectorizado desde estado i por niveles de Hamming."""
@@ -28,7 +30,8 @@ def _calcular_tensor_paralelo(args):
         # Nivel 1
         for bit in range(n):
             j = i ^ (1 << bit)
-            costos[j] = 0.5 * abs(tensor[i] - tensor[j])
+            if j < num_estados:
+                costos[j] = 0.5 * abs(tensor[i] - tensor[j])
         # Niveles 2..n
         for d in range(2, n + 1):
             gamma = 2.0 ** (-d)
@@ -37,9 +40,11 @@ def _calcular_tensor_paralelo(args):
                 for b in bits:
                     mask |= (1 << b)
                 j = i ^ mask
-                diff = abs(tensor[i] - tensor[j])
-                suma = sum(costos[j ^ (1 << b)] for b in bits)
-                costos[j] = gamma * (diff + suma)
+                if j < num_estados:
+                    diff = abs(tensor[i] - tensor[j])
+                    suma = sum(costos[j ^ (1 << b)] for b in bits
+                               if (j ^ (1 << b)) < num_estados)
+                    costos[j] = gamma * (diff + suma)
         return costos
 
     if modo_sparse:
@@ -425,7 +430,7 @@ class KGeoMIP(SIA):
             num_p = 2 ** n_p
             tpm_r = np.zeros((num_p, len(cols)), dtype=np.float64)
             cnt = np.zeros(num_p, dtype=np.int64)
-            for s in range(2 ** n):
+            for s in range(tpm.shape[0]):  # usa filas reales, no 2**n
                 ir = sum(((s >> v) & 1) << p for p, v in enumerate(pres))
                 if 0 <= ir < num_p:
                     tpm_r[ir] += tpm_cols[s]
